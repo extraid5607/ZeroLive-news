@@ -8,8 +8,11 @@ from database import get_all_subscriptions, delete_subscription
 
 logger = logging.getLogger("push_service")
 
+DEFAULT_VAPID_PUBLIC = "BGi9y17K6RN_A_3km5pV092KDHR9OG0Y1-B0afuj_05zG3anaa9mtuwi2uwy8TU8JVVixowcMOIOdknguPiYvJI"
+DEFAULT_VAPID_PRIVATE = "M3CIIH4Fy8mc3h44mCLQ_ky2b23bxfX7nT54PGdjBGQ"
+
 def get_vapid_keys() -> Dict[str, str]:
-    """Retrieves VAPID keys from environment or vapid_keys.json."""
+    """Retrieves VAPID keys from environment, vapid_keys.json, or built-in defaults."""
     pub = os.environ.get("VAPID_PUBLIC_KEY")
     priv = os.environ.get("VAPID_PRIVATE_KEY")
     if pub and priv:
@@ -19,10 +22,16 @@ def get_vapid_keys() -> Dict[str, str]:
     if os.path.exists(key_path):
         try:
             with open(key_path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                data = json.load(f)
+                if data.get("publicKey") and data.get("privateKey"):
+                    return data
         except Exception as e:
             logger.error(f"Error reading vapid_keys.json: {e}")
-    return {}
+
+    return {
+        "publicKey": DEFAULT_VAPID_PUBLIC,
+        "privateKey": DEFAULT_VAPID_PRIVATE
+    }
 
 def send_web_push(subscription: Dict[str, Any], payload: Dict[str, Any]) -> bool:
     """Sends a Web Push notification to a single subscriber."""

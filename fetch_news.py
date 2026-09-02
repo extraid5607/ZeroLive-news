@@ -44,25 +44,40 @@ RSS_FEEDS = [
     },
     {
         "source": "Moneycontrol",
-        "feed_name": "MC Live Market Wire",
-        "url": "https://news.google.com/rss/search?q=site:moneycontrol.com+when:1d&hl=en-IN&gl=IN&ceid=IN:en"
+        "feed_name": "MC Top News",
+        "url": "https://www.moneycontrol.com/rss/MCtopnews.xml"
+    },
+    {
+        "source": "Moneycontrol",
+        "feed_name": "MC Business Wire",
+        "url": "https://www.moneycontrol.com/rss/business.xml"
+    },
+    {
+        "source": "Moneycontrol",
+        "feed_name": "MC Market Reports",
+        "url": "https://www.moneycontrol.com/rss/marketreports.xml"
     },
 
     # --- International & Global Wire (High Frequency 24/7) ---
     {
         "source": "Reuters",
         "feed_name": "Reuters Markets",
-        "url": "https://news.google.com/rss/search?q=site:reuters.com/markets+when:1d&hl=en-US&gl=US&ceid=US:en"
+        "url": "https://news.google.com/rss/search?q=Reuters+markets+when:1d&hl=en-US&gl=US&ceid=US:en"
     },
     {
         "source": "Reuters",
         "feed_name": "Reuters Business",
-        "url": "https://news.google.com/rss/search?q=site:reuters.com/business+when:1d&hl=en-US&gl=US&ceid=US:en"
+        "url": "https://news.google.com/rss/search?q=Reuters+economy+business+when:1d&hl=en-US&gl=US&ceid=US:en"
     },
     {
         "source": "Bloomberg",
         "feed_name": "Bloomberg Markets",
-        "url": "https://news.google.com/rss/search?q=source:Bloomberg+when:1d&hl=en-US&gl=US&ceid=US:en"
+        "url": "https://news.google.com/rss/search?q=Bloomberg+markets+when:1d&hl=en-US&gl=US&ceid=US:en"
+    },
+    {
+        "source": "Yahoo Finance",
+        "feed_name": "Yahoo Market Wire",
+        "url": "https://finance.yahoo.com/news/rssindex"
     },
     {
         "source": "CNBC",
@@ -73,21 +88,6 @@ RSS_FEEDS = [
         "source": "CNBC",
         "feed_name": "CNBC US Markets",
         "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069"
-    },
-    {
-        "source": "CNBC",
-        "feed_name": "CNBC Economy",
-        "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258"
-    },
-    {
-        "source": "CNBC",
-        "feed_name": "CNBC Investing",
-        "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839135"
-    },
-    {
-        "source": "Yahoo Finance",
-        "feed_name": "Yahoo Market Wire",
-        "url": "https://news.google.com/rss/search?q=site:finance.yahoo.com+when:1d&hl=en-US&gl=US&ceid=US:en"
     },
     {
         "source": "Investing.com",
