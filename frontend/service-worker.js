@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zerolive-shell-v2';
+const CACHE_NAME = 'zerolive-shell-v3';
 const SHELL_ASSETS = [
   '/',
   '/about',
@@ -80,21 +80,25 @@ self.addEventListener('push', function(event) {
       data = event.data.json();
     } catch (e) {
       data = {
-        title: 'ZeroLive',
+        title: 'ZeroLive – Breaking Market Alert',
         body: event.data.text(),
-        url: '/'
+        url: '/?tab=important'
       };
     }
   }
 
-  const title = data.title || 'ZeroLive';
+  const title = data.title || 'ZeroLive – Breaking Market Alert';
+  const targetUrl = data.url || '/?tab=important';
+
   const options = {
-    body: data.body || 'Live market news, every minute.',
+    body: data.body || 'Live market breaking news.',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
     tag: data.tag || 'zerolive-alert',
+    renotify: false,
+    requireInteraction: false,
     data: {
-      url: data.url || '/'
+      url: targetUrl
     }
   };
 
@@ -105,17 +109,26 @@ self.addEventListener('push', function(event) {
 
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-  const urlToOpen = (event.notification.data && event.notification.data.url) || '/';
+
+  // Resolve target URL relative to our PWA origin
+  const rawUrl = (event.notification.data && event.notification.data.url) || '/?tab=important';
+  const targetUrl = new URL(rawUrl, self.location.origin).href;
+
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      // 1. If an app window or installed PWA is already open, focus it and navigate to the news
       for (let i = 0; i < clientList.length; i++) {
         let client = clientList[i];
-        if (client.url === urlToOpen && 'focus' in client) {
+        if (client.url && client.url.startsWith(self.location.origin) && 'focus' in client) {
+          if ('navigate' in client) {
+            client.navigate(targetUrl);
+          }
           return client.focus();
         }
       }
+      // 2. If the app is closed, open the window in standalone PWA mode
       if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
+        return clients.openWindow(targetUrl);
       }
     })
   );
