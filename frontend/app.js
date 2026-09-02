@@ -111,7 +111,13 @@
     shareCopyLabel: document.getElementById('shareCopyLabel'),
     pushToggleBtn: document.getElementById('pushToggleBtn'),
     pushIcon: document.getElementById('pushIcon'),
-    pushLabel: document.getElementById('pushLabel')
+    pushLabel: document.getElementById('pushLabel'),
+    installPwaBtn: document.getElementById('installPwaBtn'),
+    installModalOverlay: document.getElementById('installModalOverlay'),
+    installModalCloseBtn: document.getElementById('installModalCloseBtn'),
+    installModalDismissBtn: document.getElementById('installModalDismissBtn'),
+    iosInstallGuide: document.getElementById('iosInstallGuide'),
+    generalInstallGuide: document.getElementById('generalInstallGuide')
   };
 
   // ---------------------------------------------------------------------------
@@ -1724,10 +1730,94 @@
   }
 
   // ---------------------------------------------------------------------------
+  // PWA Install Prompt & Standalone Mode Detection
+  // ---------------------------------------------------------------------------
+  let deferredInstallPrompt = null;
+
+  function isRunningStandalone() {
+    return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+           (window.navigator && window.navigator.standalone === true);
+  }
+
+  function initPwaInstall() {
+    // If already running as installed standalone PWA, hide install button
+    if (isRunningStandalone()) {
+      document.body.classList.add('pwa-installed');
+      if (dom.installPwaBtn) dom.installPwaBtn.style.display = 'none';
+      return;
+    }
+
+    // Capture Chrome/Android beforeinstallprompt event
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      if (dom.installPwaBtn) {
+        dom.installPwaBtn.style.display = 'inline-flex';
+      }
+    });
+
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      document.body.classList.add('pwa-installed');
+      if (dom.installPwaBtn) dom.installPwaBtn.style.display = 'none';
+      showToast('ZeroLive app installed to your Home Screen! 📲', '✅');
+    });
+
+    if (dom.installPwaBtn) {
+      dom.installPwaBtn.addEventListener('click', handleInstallClick);
+    }
+    if (dom.installModalCloseBtn) {
+      dom.installModalCloseBtn.addEventListener('click', closeInstallModal);
+    }
+    if (dom.installModalDismissBtn) {
+      dom.installModalDismissBtn.addEventListener('click', closeInstallModal);
+    }
+    if (dom.installModalOverlay) {
+      dom.installModalOverlay.addEventListener('click', (e) => {
+        if (e.target === dom.installModalOverlay) closeInstallModal();
+      });
+    }
+  }
+
+  async function handleInstallClick() {
+    if (deferredInstallPrompt) {
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        if (dom.installPwaBtn) dom.installPwaBtn.style.display = 'none';
+        showToast('Installing ZeroLive... 📲', '⏳');
+      }
+      deferredInstallPrompt = null;
+    } else {
+      openInstallModal();
+    }
+  }
+
+  function openInstallModal() {
+    if (!dom.installModalOverlay) return;
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (dom.iosInstallGuide && dom.generalInstallGuide) {
+      if (isIOS) {
+        dom.iosInstallGuide.style.display = 'block';
+        dom.generalInstallGuide.style.display = 'none';
+      } else {
+        dom.iosInstallGuide.style.display = 'none';
+        dom.generalInstallGuide.style.display = 'block';
+      }
+    }
+    dom.installModalOverlay.classList.remove('hidden');
+  }
+
+  function closeInstallModal() {
+    if (dom.installModalOverlay) dom.installModalOverlay.classList.add('hidden');
+  }
+
+  // ---------------------------------------------------------------------------
   // App Initialization
   // ---------------------------------------------------------------------------
   function init() {
     initTheme();
+    initPwaInstall();
     updateLiveClock();
     updateMarketStatus();
     setupEventListeners();

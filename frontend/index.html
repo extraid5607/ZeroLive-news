@@ -93,6 +93,12 @@
 
           <!-- Controls -->
           <div class="sync-controls">
+            <!-- Install PWA App Button -->
+            <button class="btn-install-pwa" id="installPwaBtn" title="Install ZeroLive App to your device" aria-label="Install App">
+              <span class="install-icon">📲</span>
+              <span class="install-label">Install App</span>
+            </button>
+
             <!-- About Page Link -->
             <a href="/about" class="btn-nav-about" title="About ZeroLive, Methodology & SEBI Disclaimer">ℹ️ About</a>
 
@@ -526,6 +532,48 @@
     </div>
   </div>
 
-  <script src="/static/app.js?v=4.6"></script>
+  <!-- PWA Install Guide Modal (for iOS & unsupported browsers) -->
+  <div class="modal-overlay hidden" id="installModalOverlay">
+    <div class="modal-card">
+      <div class="drawer-handle-bar"></div>
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge">📲 INSTALL ZEROLIVE APP</span>
+          <h3 class="modal-title">Add to Home Screen</h3>
+        </div>
+        <button class="modal-close-btn" id="installModalCloseBtn" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="text-align: center; margin-bottom: 1.25rem;">
+          <img src="/icons/icon-192.png" width="72" height="72" style="border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); margin-bottom: 0.75rem;" alt="ZeroLive Icon">
+          <h4 style="color: var(--text-primary); font-size: 1.1rem; margin-bottom: 0.25rem;">ZeroLive Terminal</h4>
+          <p style="color: var(--text-secondary); font-size: 0.85rem;">Install as a standalone full-screen app on your device.</p>
+        </div>
+        <div class="install-instructions" style="background: var(--bg-surface-2); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+          <div id="iosInstallGuide" style="display: none;">
+            <p style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">For iPhone / iPad (Safari):</p>
+            <ol style="margin-left: 1.25rem; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.7;">
+              <li>Tap the <strong>Share</strong> button (<strong>⎋</strong>) in the Safari toolbar.</li>
+              <li>Scroll down and tap <strong>"Add to Home Screen"</strong> (<strong>➕</strong>).</li>
+              <li>Tap <strong>Add</strong> at the top right to launch directly from your home screen!</li>
+            </ol>
+          </div>
+          <div id="generalInstallGuide">
+            <p style="font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">For Chrome / Android / Desktop:</p>
+            <ol style="margin-left: 1.25rem; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.7;">
+              <li>Tap the browser menu (<strong>⋮</strong> or <strong>…</strong>) at top/bottom right.</li>
+              <li>Select <strong>"Install app"</strong> or <strong>"Add to Home Screen"</strong>.</li>
+              <li>Confirm install to open ZeroLive without browser address bar!</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-primary-modal" id="installModalDismissBtn">Got it, thanks!</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=4.7"></script>
 </body>
 </html>

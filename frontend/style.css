@@ -868,6 +868,45 @@ body {
   transform: scale(0.95);
 }
 
+.btn-install-pwa {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.8rem;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(56, 189, 248, 0.15));
+  border: 1px solid #38bdf8;
+  color: #38bdf8;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: all 0.2s var(--ease-spring);
+}
+
+.btn-install-pwa:hover {
+  background: #0284c7;
+  color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+}
+
+[data-theme="light"] .btn-install-pwa {
+  background: #eff6ff;
+  border: 1px solid #0284c7;
+  color: #0284c7;
+}
+
+[data-theme="light"] .btn-install-pwa:hover {
+  background: #0284c7;
+  color: #ffffff;
+}
+
+body.pwa-installed .btn-install-pwa {
+  display: none !important;
+}
+
 .btn-nav-about {
   display: inline-flex;
   align-items: center;
@@ -3075,7 +3114,8 @@ body {
 
   .btn-push-toggle,
   .btn-theme-toggle,
-  .btn-refresh {
+  .btn-refresh,
+  .btn-install-pwa {
     width: 33px;
     height: 33px;
     padding: 0;
@@ -3086,6 +3126,7 @@ body {
     flex-shrink: 0;
   }
 
+  .btn-install-pwa .install-label,
   .btn-push-toggle .push-label,
   .btn-refresh .refresh-label {
     display: none; /* Show only icons on mobile */
