@@ -136,6 +136,13 @@ def init_db():
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_articles_type ON articles (type);")
             except Exception:
                 pass
+
+        # Cleanup legacy stale articles older than 14 days (e.g. outdated 861d Moneycontrol XML entries)
+        try:
+            cur.execute("DELETE FROM articles WHERE published_at < datetime('now', '-14 days');")
+        except Exception:
+            pass
+
         conn.commit()
     finally:
         conn.close()

@@ -43,41 +43,46 @@ RSS_FEEDS = [
         "url": "https://www.livemint.com/rss/markets"
     },
     {
-        "source": "Moneycontrol",
-        "feed_name": "MC Top News",
-        "url": "https://www.moneycontrol.com/rss/MCtopnews.xml"
-    },
-    {
-        "source": "Moneycontrol",
-        "feed_name": "MC Business Wire",
-        "url": "https://www.moneycontrol.com/rss/business.xml"
-    },
-    {
-        "source": "Moneycontrol",
-        "feed_name": "MC Market Reports",
-        "url": "https://www.moneycontrol.com/rss/marketreports.xml"
+        "source": "Financial Express",
+        "feed_name": "FE Markets",
+        "url": "https://www.financialexpress.com/market/feed/"
     },
 
     # --- International & Global Wire (High Frequency 24/7) ---
     {
         "source": "Reuters",
-        "feed_name": "Reuters Markets",
-        "url": "https://news.google.com/rss/search?q=Reuters+markets+when:1d&hl=en-US&gl=US&ceid=US:en"
+        "feed_name": "Reuters Global Economy",
+        "url": "https://www.investing.com/rss/news_14.rss"
     },
     {
         "source": "Reuters",
-        "feed_name": "Reuters Business",
-        "url": "https://news.google.com/rss/search?q=Reuters+economy+business+when:1d&hl=en-US&gl=US&ceid=US:en"
+        "feed_name": "Reuters Market Wire",
+        "url": "https://www.investing.com/rss/news_25.rss"
+    },
+    {
+        "source": "Reuters",
+        "feed_name": "Reuters Currencies & FX",
+        "url": "https://www.investing.com/rss/news_1.rss"
     },
     {
         "source": "Bloomberg",
-        "feed_name": "Bloomberg Markets",
-        "url": "https://news.google.com/rss/search?q=Bloomberg+markets+when:1d&hl=en-US&gl=US&ceid=US:en"
+        "feed_name": "Bloomberg Markets Wire",
+        "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
+    },
+    {
+        "source": "Bloomberg",
+        "feed_name": "Bloomberg World Macro",
+        "url": "https://feeds.bbci.co.uk/news/business/rss.xml"
     },
     {
         "source": "Yahoo Finance",
         "feed_name": "Yahoo Market Wire",
         "url": "https://finance.yahoo.com/news/rssindex"
+    },
+    {
+        "source": "Yahoo Finance",
+        "feed_name": "Yahoo Asia & Global",
+        "url": "https://sg.finance.yahoo.com/news/rssindex"
     },
     {
         "source": "CNBC",
@@ -88,6 +93,11 @@ RSS_FEEDS = [
         "source": "CNBC",
         "feed_name": "CNBC US Markets",
         "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069"
+    },
+    {
+        "source": "CNBC",
+        "feed_name": "CNBC Economy",
+        "url": "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=20910258"
     },
     {
         "source": "Investing.com",
@@ -101,8 +111,8 @@ RSS_FEEDS = [
     },
     {
         "source": "Financial Times",
-        "feed_name": "FT Markets",
-        "url": "https://news.google.com/rss/search?q=source:%22Financial+Times%22+when:1d&hl=en-US&gl=US&ceid=US:en"
+        "feed_name": "FT MarketWatch",
+        "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories"
     },
 
     # --- Trump Truth & Tariff Wire ---
@@ -539,14 +549,77 @@ def fetch_bse_corporate_announcements() -> List[Dict[str, Any]]:
 
     return articles
 
+def fetch_moneycontrol_live() -> List[Dict[str, Any]]:
+    """Scrapes live market articles directly from Moneycontrol Markets webpage."""
+    url = "https://www.moneycontrol.com/news/business/markets/"
+    logger.info("Fetching live articles directly from Moneycontrol...")
+    articles = []
+    headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9"
+    }
+
+    try:
+        resp = requests.get(url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            soup = BeautifulSoup(resp.text, "html.parser")
+            now_dt = datetime.now(timezone.utc)
+            now_str = now_dt.strftime("%d %b %Y, %I:%M %p IST")
+
+            for li in soup.find_all("li", class_="clearfix"):
+                h2 = li.find("h2") or li.find("h3")
+                a = li.find("a")
+                p = li.find("p")
+                span = li.find("span")
+                if h2 and a and a.get("href"):
+                    title = clean_html(h2.get_text(strip=True))
+                    link = a.get("href", "").strip()
+                    desc = clean_html(p.get_text(strip=True)) if p else title
+                    time_text = span.get_text(strip=True) if span else ""
+
+                    if not title or not link or "javascript:" in link:
+                        continue
+
+                    # Parse published time or fallback to now
+                    pub_dt = now_dt
+                    pub_str = now_str
+                    if time_text:
+                        try:
+                            clean_time = re.sub(r"\s+IST$", "", time_text.strip())
+                            parsed = dateutil.parser.parse(clean_time)
+                            pub_dt = parsed.replace(tzinfo=timezone.utc)
+                            pub_str = time_text
+                        except Exception:
+                            pass
+
+                    sentiment, category = analyze_sentiment_and_category(title, desc)
+                    articles.append({
+                        "title": title,
+                        "link": link,
+                        "source": "Moneycontrol",
+                        "feed_name": "MC Live Markets",
+                        "description": desc,
+                        "published_at": pub_dt,
+                        "published_str": pub_str,
+                        "sentiment": sentiment,
+                        "category": category
+                    })
+            logger.info(f"Retrieved {len(articles)} live articles directly from Moneycontrol")
+    except Exception as e:
+        logger.warning(f"Failed to fetch live Moneycontrol articles: {e}")
+
+    return articles
+
 def fetch_and_store_all_news() -> Tuple[int, int]:
     """
     Main ingestion coordinator:
-    1. Fetches RSS feeds (ET, BS, LiveMint).
+    1. Fetches RSS feeds (ET, BS, LiveMint, Reuters, Bloomberg, Yahoo, CNBC, Investing).
     2. Fetches direct NSE & BSE Corporate Announcements.
-    3. Deduplicates across all sources.
-    4. Sorts newest first.
-    5. Upserts into database (Postgres or SQLite).
+    3. Fetches live Moneycontrol Market News.
+    4. Deduplicates across all sources.
+    5. Sorts newest first.
+    6. Upserts into database (Postgres or SQLite).
     """
     start_time = time.time()
     init_db()
@@ -572,6 +645,13 @@ def fetch_and_store_all_news() -> Tuple[int, int]:
     # 3. Fetch Direct BSE Corporate Announcements
     bse_articles = fetch_bse_corporate_announcements()
     for art in bse_articles:
+        if art["link"] not in seen_links:
+            seen_links.add(art["link"])
+            all_articles.append(art)
+
+    # 4. Fetch Direct Moneycontrol Live News
+    mc_articles = fetch_moneycontrol_live()
+    for art in mc_articles:
         if art["link"] not in seen_links:
             seen_links.add(art["link"])
             all_articles.append(art)
