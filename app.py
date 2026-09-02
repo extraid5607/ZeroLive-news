@@ -56,6 +56,23 @@ async def background_news_fetch_loop():
         # Automatically wait 120 seconds (2 minutes) before next cycle
         await asyncio.sleep(120)
 
+async def keep_alive_ping_loop():
+    """Pings the public /api/health endpoint every 8 minutes to prevent Render free-tier idle sleep."""
+    live_url = os.environ.get("RENDER_EXTERNAL_URL", "https://zerolivenews.onrender.com").rstrip("/")
+    logger.info(f"Keep-alive self-ping worker active for: {live_url}/api/health")
+    # Wait 2 minutes after boot before first ping
+    await asyncio.sleep(120)
+    while True:
+        try:
+            def _ping():
+                return requests.get(f"{live_url}/api/health", timeout=15.0)
+            resp = await asyncio.to_thread(_ping)
+            logger.info(f"Keep-alive self-ping sent to {live_url}/api/health -> Status: {resp.status_code}")
+        except Exception as e:
+            logger.warning(f"Keep-alive self-ping warning: {e}")
+        # Ping every 8 minutes (480 seconds) — Render sleeps after 15 minutes of idle
+        await asyncio.sleep(480)
+
 @app.on_event("startup")
 async def on_startup():
     """Ensure database is initialized on boot, backfill types, and start 24/7 background auto-fetch worker."""
@@ -70,6 +87,8 @@ async def on_startup():
     logger.info(f"Server started. Current database articles: {stats['total_articles']}")
     # Launch continuous background news scraper task
     asyncio.create_task(background_news_fetch_loop())
+    # Launch keep-alive self-ping task to prevent 15-minute idle sleep
+    asyncio.create_task(keep_alive_ping_loop())
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
@@ -557,10 +576,15 @@ async def get_market_holidays():
         "count": len(holidays)
     }
 
+@app.get("/healthz")
 @app.get("/api/health")
 async def health_check():
-    """Healthcheck endpoint for monitoring / Render deployment checks."""
-    return {"status": "ok", "service": "indian-stock-news-server"}
+    """Healthcheck endpoint for monitoring / Render deployment checks and keep-alive pings."""
+    return {
+        "status": "ok",
+        "service": "ZeroLive-news",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 if __name__ == "__main__":
     import uvicorn
