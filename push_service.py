@@ -65,41 +65,54 @@ def send_web_push(subscription: Dict[str, Any], payload: Dict[str, Any]) -> bool
         logger.error(f"Unexpected error sending push: {e}")
         return False
 
-def broadcast_news_alerts(articles: List[Dict[str, Any]]) -> int:
-    """Broadcasts push notification to all subscribers ONLY for articles where type == 'important'."""
-    if not articles:
-        return 0
+def broadcast_news_alerts(articles: Optional[List[Dict[str, Any]]] = None) -> int:
+    """
+    Broadcasts a push notification to all subscribers ONLY when a BRAND NEW article
+    arrives in the 'important' news section.
 
-    important_articles = [art for art in articles if art.get("type") == "important"]
-    if not important_articles:
+    Guarantees:
+    - Never sends repeat notifications on the same news.
+    - Sends exactly one alert per newly arrived important news item.
+    - Directs the user to the installed PWA app (/?tab=important) instead of an external browser.
+    """
+    from database import get_unpushed_important_article, mark_article_as_pushed
+
+    # 1. Check if there is a newly arrived important article that has not been pushed yet
+    art = get_unpushed_important_article()
+    if not art:
+        # No new important news -> send NOTHING
         return 0
 
     subscriptions = get_all_subscriptions()
     if not subscriptions:
+        # Mark as pushed so we don't accumulate backlog when no users are subscribed
+        mark_article_as_pushed(art["id"])
         return 0
 
-    if len(important_articles) == 1:
-        art = important_articles[0]
-        payload = {
-            "title": "ZeroLive – Breaking Market Alert",
-            "body": art.get("title", ""),
-            "url": art.get("link", "https://zerolive.in/"),
-            "tag": f"news-{abs(hash(art.get('title', '')))}"
-        }
-    else:
-        top_titles = [f"• {a.get('title', '')}" for a in important_articles[:3]]
-        payload = {
-            "title": f"ZeroLive – {len(important_articles)} Breaking Updates",
-            "body": "\n".join(top_titles),
-            "url": "https://zerolive.in/",
-            "tag": f"news-batch-{len(important_articles)}"
-        }
+    art_title = art.get("title", "").strip()
+    art_source = art.get("source", "").strip()
+    art_id = art.get("id")
+
+    # The URL MUST stay within the PWA scope so the OS opens the installed app
+    pwa_url = f"/?tab=important&story={art_id}"
+
+    payload = {
+        "title": f"⚡ {art_source or 'ZeroLive'} Breaking Alert",
+        "body": art_title,
+        "url": pwa_url,
+        "tag": f"zerolive-important-{art_id}",
+        "icon": "/icons/icon-192.png",
+        "badge": "/icons/icon-192.png"
+    }
 
     sent_count = 0
     for sub in subscriptions:
         if send_web_push(sub, payload):
             sent_count += 1
 
-    logger.info(f"Pushed alert to {sent_count}/{len(subscriptions)} subscribers for {len(important_articles)} important stories.")
+    # Mark as pushed immediately so this article will NEVER be sent again
+    mark_article_as_pushed(art_id)
+
+    logger.info(f"Pushed breaking alert for [{art_title[:50]}] to {sent_count}/{len(subscriptions)} devices.")
     return sent_count
 

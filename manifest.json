@@ -1,7 +1,9 @@
 {
   "name": "ZeroLive - Live Market News",
   "short_name": "ZeroLive",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0a0a0c",
   "theme_color": "#0a0a0c",

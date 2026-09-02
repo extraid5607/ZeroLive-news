@@ -671,11 +671,11 @@ def fetch_and_store_all_news() -> Tuple[int, int]:
 
     logger.info(f"Ingestion complete in {elapsed:.2f}s: {inserted} newly inserted, {skipped} existing skipped.")
 
-    # Broadcast real-time Web Push alerts if important news was detected
+    # Broadcast real-time Web Push alert ONLY if a brand new important story was inserted
     if inserted > 0:
         try:
             from push_service import broadcast_news_alerts
-            pushed = broadcast_news_alerts(all_articles[:inserted])
+            pushed = broadcast_news_alerts()
             if pushed > 0:
                 logger.info(f"Broadcasted breaking news push notification to {pushed} devices.")
         except Exception as push_err:

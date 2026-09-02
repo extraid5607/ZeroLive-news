@@ -419,7 +419,7 @@ async def send_test_push(request: Request):
         payload = {
             "title": "⚡ ZeroLive Breaking Alert",
             "body": "NIFTY surges +1.2% | Banking & IT rally on strong corporate filings.",
-            "url": "https://zerolive.in/",
+            "url": "/?tab=important",
             "tag": f"test-push-{int(time.time())}"
         }
         success = send_web_push(sub_data, payload)

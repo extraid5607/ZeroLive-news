@@ -85,7 +85,12 @@ def init_db():
             except Exception:
                 pass
             try:
+                cur.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS pushed INTEGER DEFAULT 0;")
+            except Exception:
+                pass
+            try:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_articles_type ON articles (type);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_articles_pushed ON articles (pushed, type);")
             except Exception:
                 pass
         else:
@@ -102,6 +107,7 @@ def init_db():
                     sentiment TEXT DEFAULT 'NEUTRAL',
                     category TEXT DEFAULT 'GENERAL',
                     type TEXT DEFAULT 'general',
+                    pushed INTEGER DEFAULT 0,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles (published_at DESC);
@@ -133,13 +139,24 @@ def init_db():
             except Exception:
                 pass
             try:
+                cur.execute("ALTER TABLE articles ADD COLUMN pushed INTEGER DEFAULT 0;")
+            except Exception:
+                pass
+            try:
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_articles_type ON articles (type);")
+                cur.execute("CREATE INDEX IF NOT EXISTS idx_articles_pushed ON articles (pushed, type);")
             except Exception:
                 pass
 
         # Cleanup legacy stale articles older than 14 days (e.g. outdated 861d Moneycontrol XML entries)
         try:
             cur.execute("DELETE FROM articles WHERE published_at < datetime('now', '-14 days');")
+        except Exception:
+            pass
+
+        # One-time initialization: mark existing history as already pushed so we only alert on NEW arrivals
+        try:
+            cur.execute("UPDATE articles SET pushed = 1 WHERE pushed IS NULL;")
         except Exception:
             pass
 
@@ -228,6 +245,58 @@ def upsert_articles(articles: List[Dict[str, Any]]) -> Tuple[int, int]:
         conn.close()
 
     return inserted_count, skipped_count
+
+def get_unpushed_important_article() -> Optional[Dict[str, Any]]:
+    """
+    Retrieves the newest unpushed 'important' article from the database.
+    Only returns an article if it has never had a push notification sent (pushed == 0).
+    """
+    init_db()
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        query = """
+            SELECT id, title, link, source, feed_name, description, published_str
+            FROM articles
+            WHERE type = 'important' AND (pushed IS NULL OR pushed = 0)
+            ORDER BY published_at DESC
+            LIMIT 1;
+        """
+        cur.execute(query)
+        row = cur.fetchone()
+        if row:
+            if hasattr(row, 'keys'):
+                return dict(row)
+            return {
+                "id": row[0],
+                "title": row[1],
+                "link": row[2],
+                "source": row[3],
+                "feed_name": row[4],
+                "description": row[5],
+                "published_str": row[6]
+            }
+        return None
+    finally:
+        conn.close()
+
+def mark_article_as_pushed(article_id: int):
+    """
+    Marks an article as pushed (pushed = 1).
+    Also marks all existing unpushed important articles so we never replay an old backlog.
+    """
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        if is_postgres():
+            cur.execute("UPDATE articles SET pushed = 1 WHERE id = %s;", (article_id,))
+            cur.execute("UPDATE articles SET pushed = 1 WHERE type = 'important' AND (pushed IS NULL OR pushed = 0);")
+        else:
+            cur.execute("UPDATE articles SET pushed = 1 WHERE id = ?;", (article_id,))
+            cur.execute("UPDATE articles SET pushed = 1 WHERE type = 'important' AND (pushed IS NULL OR pushed = 0);")
+        conn.commit()
+    finally:
+        conn.close()
 
 def get_articles(
     source: Optional[str] = None,
