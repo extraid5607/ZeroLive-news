@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ZeroLive – Live Stock Market News, NSE & BSE Updates Every 5 Minutes</title>
+  <meta name="description" content="Real-time Indian and global stock market news from Economic Times, Business Standard, Yahoo Finance, CNBC and more — updated every 5 minutes.">
+  <meta name="keywords" content="stock market news, NSE, BSE, live market news, Indian stock market, share market news">
+
+  <!-- Open Graph (for WhatsApp/Telegram/social link previews) -->
+  <meta property="og:title" content="ZeroLive – Live Market News">
+  <meta property="og:description" content="Live market news, every minute.">
+  <meta property="og:image" content="https://zerolive.in/preview.png">
+  <meta property="og:url" content="https://zerolive.in">
+  <meta property="og:type" content="website">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ZeroLive – Live Market News">
+  <meta name="twitter:description" content="Live market news, every minute.">
+  <meta name="twitter:image" content="https://zerolive.in/preview.png">
+
+  <link rel="canonical" href="https://zerolive.in">
+
+  <!-- PWA Web App Manifest & Theme Color -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a0c">
+
+  <!-- iOS PWA Specific Meta Tags -->
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ZeroLive">
+
+
+  <!-- Google Fonts: Syne / Space Grotesk for display, Inter for high-readability body -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/style.css?v=4.7">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <script>
+    // Register Service Worker for ZeroLive Web Push Notifications
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
+          .then(function(reg) {
+            console.log('ZeroLive ServiceWorker registered with scope:', reg.scope);
+          })
+          .catch(function(err) {
+            console.warn('ServiceWorker registration error:', err);
+          });
+      });
+    }
+  </script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation / Ticker Header -->
+    <header class="top-nav">
+      <div class="nav-container">
+        <div class="brand-section">
+          <div class="brand-logo">
+            <svg class="zerolive-logo-svg" width="38" height="38" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Outer Circle Ring -->
+              <circle cx="24" cy="24" r="19" class="logo-circle-ring" stroke="currentColor" stroke-width="2.2" />
+              <!-- Green ECG Heartbeat Waveform -->
+              <path d="M6 24H16L19.5 12L25.5 35L29 18L32 24H42" stroke="#00e676" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+              <!-- Coral Red Live Dot -->
+              <circle cx="37.5" cy="10.5" r="4.2" fill="#ef4444" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1 class="brand-title">Zero<span class="accent-live">Live</span></h1>
+            <p class="brand-tagline">Live market news, every minute</p>
+          </div>
+        </div>
+
+        <div class="market-meta-section">
+          <!-- Live Running IST Clock -->
+          <div class="live-clock-pill" id="liveClockPill" title="Live Indian Standard Time (IST - UTC+5:30)">
+            <span class="clock-pulse-dot"></span>
+            <span class="clock-label">IST:</span>
+            <span class="clock-time font-mono" id="liveClockText">--:--:--</span>
+          </div>
+
+          <!-- NSE/BSE Market Status Badge -->
+          <div class="market-status-pill" id="marketStatusPill" title="Calculated based on IST Market Hours (09:15 - 15:30)">
+            <span class="status-dot" id="marketStatusDot"></span>
+            <span class="status-text" id="marketStatusText">CHECKING...</span>
+          </div>
+
+          <!-- Controls -->
+          <div class="sync-controls">
+            <!-- About Page Link -->
+            <a href="/about" class="btn-nav-about" title="About ZeroLive, Methodology & SEBI Disclaimer">ℹ️ About</a>
+
+            <!-- Push Notification Button -->
+            <button class="btn-push-toggle" id="pushToggleBtn" title="Enable Breaking Market Push Notifications" aria-label="Enable Push Notifications">
+              <span class="push-icon" id="pushIcon">🔔</span>
+              <span class="push-label" id="pushLabel">Alerts</span>
+            </button>
+
+            <!-- Theme Toggle Button -->
+            <button class="btn-theme-toggle" id="themeToggleBtn" title="Switch Light/Dark Theme" aria-label="Toggle Theme">
+              <span class="theme-icon theme-icon-dark">🌙</span>
+              <span class="theme-icon theme-icon-light hidden">☀️</span>
+            </button>
+            <button class="btn-refresh" id="refreshBtn" title="Fetch latest news immediately" aria-label="Refresh News">
+              <svg class="refresh-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+              </svg>
+              <span class="refresh-label">REFRESH</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-Time Market Indices Ribbon -->
+      <div class="market-ticker-wrap" id="marketTickerWrap">
+        <div class="ticker-badge"><span>⚡</span> MARKETS</div>
+        <div class="ticker-viewport">
+          <div class="market-ticker-track" id="marketTickerTrack">
+            <!-- Dynamically populated live indices -->
+            <div class="ticker-item"><span class="ticker-name">SYNCING LIVE INDICES...</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Broadcast / Stats Bar -->
+      <div class="stats-bar">
+        <div class="stats-bar-inner">
+          <div class="stat-item">
+            <span class="stat-label">TOTAL STORIES:</span>
+            <span class="stat-value" id="statTotalArticles">--</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-label">BULLISH SIGNALS:</span>
+            <span class="stat-value text-gain" id="statBullishCount">--</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-label">BEARISH SIGNALS:</span>
+            <span class="stat-value text-loss" id="statBearishCount">--</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item">
+            <span class="stat-label">LAST UPDATED:</span>
+            <span class="stat-value text-secondary font-mono" id="lastUpdatedTime">Syncing...</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-item timer-item">
+            <span class="stat-label">AUTO-SYNC IN:</span>
+            <span class="stat-value text-cyan font-mono" id="autoRefreshCountdown">01:00</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Stream Area -->
+    <main class="main-content">
+      <!-- Connection Alert Banner (Shown if local server is unreachable or opened via file://) -->
+      <div class="connection-banner hidden" id="connectionBanner">
+        <div class="banner-content">
+          <span class="banner-icon">⚠️</span>
+          <div class="banner-text">
+            <strong>Server Not Connected:</strong> Could not reach the news backend. Make sure the server is started with <code>python app.py</code> or double-click <code>start.bat</code>, then open <a href="http://localhost:8000" id="bannerLocalhostLink">http://localhost:8000</a>.
+          </div>
+        </div>
+        <button class="banner-retry-btn" id="bannerRetryBtn">Retry Connection</button>
+      </div>
+
+      <!-- Filter & Search Toolbar -->
+      <section class="control-panel">
+        <div class="control-panel-wrapper">
+          <!-- Source Filter Tabs (7 Tabs with Important News as Default) -->
+          <div class="source-tabs" role="tablist">
+            <!-- 1. Important News (DEFAULT TAB) -->
+            <button class="source-tab active tab-important" id="sourceImportant" data-source="All" data-type="important" role="tab" aria-selected="true">
+              🔥 Important News <span class="tab-badge" id="badgeImportant">0</span>
+            </button>
+
+            <!-- 2. All Feeds (Unchanged, no filter, everything) -->
+            <button class="source-tab" id="sourceAll" data-source="All" data-type="all" role="tab" aria-selected="false">
+              All Feeds <span class="tab-badge" id="badgeAll">0</span>
+            </button>
+
+            <!-- 3. Indian Media with Dropdown -->
+            <div class="source-tab-group" id="groupIndian">
+              <button class="source-tab tab-group-btn tab-mc" id="sourceIndian" data-source="indian" data-type="all" role="tab" aria-selected="false">
+                🇮🇳 Indian <span class="tab-badge" id="badgeIndian">0</span>
+              </button>
+              <button class="tab-dropdown-trigger" id="triggerIndian" title="Select specific Indian news source" aria-label="Indian Media Options">▾</button>
+              <div class="tab-dropdown-menu" id="menuIndian">
+                <div class="menu-mobile-header">
+                  <span class="menu-mobile-title">🇮🇳 Indian Media</span>
+                  <button class="menu-close-btn" aria-label="Close menu">&times;</button>
+                </div>
+                <button class="dropdown-item active" data-source="indian" data-type="all" data-parent="groupIndian">🇮🇳 All Indian Media</button>
+                <button class="dropdown-item" data-source="Moneycontrol" data-type="all" data-parent="groupIndian">💰 Moneycontrol</button>
+                <button class="dropdown-item" data-source="Economic Times" data-type="all" data-parent="groupIndian">📰 Economic Times</button>
+                <button class="dropdown-item" data-source="Business Standard" data-type="all" data-parent="groupIndian">📑 Business Standard</button>
+                <button class="dropdown-item" data-source="LiveMint" data-type="all" data-parent="groupIndian">🌿 LiveMint</button>
+              </div>
+            </div>
+
+            <!-- 4. International with Dropdown -->
+            <div class="source-tab-group" id="groupInternational">
+              <button class="source-tab tab-group-btn tab-reuters" id="sourceInternational" data-source="international" data-type="all" role="tab" aria-selected="false">
+                🌐 Global <span class="tab-badge" id="badgeInternational">0</span>
+              </button>
+              <button class="tab-dropdown-trigger" id="triggerInternational" title="Select specific global source" aria-label="International Options">▾</button>
+              <div class="tab-dropdown-menu" id="menuInternational">
+                <div class="menu-mobile-header">
+                  <span class="menu-mobile-title">🌐 Global News Wire</span>
+                  <button class="menu-close-btn" aria-label="Close menu">&times;</button>
+                </div>
+                <button class="dropdown-item active" data-source="international" data-type="all" data-parent="groupInternational">🌐 All Global Wire</button>
+                <button class="dropdown-item" data-source="Reuters" data-type="all" data-parent="groupInternational">⚡ Reuters</button>
+                <button class="dropdown-item" data-source="Bloomberg" data-type="all" data-parent="groupInternational">📈 Bloomberg</button>
+                <button class="dropdown-item" data-source="CNBC" data-type="all" data-parent="groupInternational">🇺🇸 CNBC Global</button>
+                <button class="dropdown-item" data-source="Yahoo Finance" data-type="all" data-parent="groupInternational">📊 Yahoo Finance</button>
+                <button class="dropdown-item" data-source="Investing.com" data-type="all" data-parent="groupInternational">💹 Investing.com</button>
+                <button class="dropdown-item" data-source="Financial Times" data-type="all" data-parent="groupInternational">📑 Financial Times</button>
+              </div>
+            </div>
+
+            <!-- 5. Filings (Renamed from Exchange, Filter: type="filing") -->
+            <div class="source-tab-group" id="groupFilings">
+              <button class="source-tab tab-group-btn tab-nse" id="sourceFilings" data-source="filings" data-type="filing" role="tab" aria-selected="false">
+                🏛️ NSE/BSE <span class="tab-badge" id="badgeFilings">0</span>
+              </button>
+              <button class="tab-dropdown-trigger" id="triggerFilings" title="Select specific filing source" aria-label="Filing Options">▾</button>
+              <div class="tab-dropdown-menu" id="menuFilings">
+                <div class="menu-mobile-header">
+                  <span class="menu-mobile-title">🏛️ Corporate Filings</span>
+                  <button class="menu-close-btn" aria-label="Close menu">&times;</button>
+                </div>
+                <button class="dropdown-item active" data-source="filings" data-type="filing" data-parent="groupFilings">🏛️ All Corporate Filings</button>
+                <button class="dropdown-item" data-source="NSE India" data-type="filing" data-parent="groupFilings">🔴 NSE India Official</button>
+                <button class="dropdown-item" data-source="BSE India" data-type="filing" data-parent="groupFilings">🟣 BSE India Official</button>
+              </div>
+            </div>
+
+            <!-- 6. Trump Wire -->
+            <button class="source-tab tab-trump" id="sourceTrump" data-source="Trump Wire" data-type="all" role="tab" aria-selected="false">
+              🦅 Trump Wire <span class="tab-badge" id="badgeTrump">0</span>
+            </button>
+
+            <!-- 7. Key Events (NEW DEDICATED TAB) -->
+            <button class="source-tab tab-events" id="sourceEvents" data-source="Events" data-type="events" role="tab" aria-selected="false">
+              📅 Key Events <span class="tab-badge" id="badgeEvents">4</span>
+            </button>
+
+            <!-- 8. Saved Stories -->
+            <button class="source-tab tab-bookmarks" id="sourceBookmarks" data-source="Bookmarks" data-type="all" role="tab" aria-selected="false">
+              ⭐ Saved <span class="tab-badge" id="badgeBookmarks">0</span>
+            </button>
+          </div>
+
+          <!-- Secondary Filters: Sentiment & Search -->
+          <div class="filter-actions" id="filterActionsBar">
+            <!-- Sentiment & Key Macro Event Pills -->
+            <div class="sentiment-pills">
+              <button class="sentiment-pill active" data-sentiment="All">All Signals</button>
+              <button class="sentiment-pill pill-macro" data-sentiment="MACRO_EVENTS" title="Key Indian & Global Central Bank Events (RBI, FED, Rate Decisions, Inflation, Policy)">
+                <span class="pill-dot macro-dot"></span>🏛️ RBI / FED / Rates
+              </button>
+              <button class="sentiment-pill pill-bullish" data-sentiment="BULLISH">
+                <span class="pill-dot gain-dot"></span>Bullish
+              </button>
+              <button class="sentiment-pill pill-bearish" data-sentiment="BEARISH">
+                <span class="pill-dot loss-dot"></span>Bearish
+              </button>
+              <button class="sentiment-pill pill-earnings" data-sentiment="EARNINGS">
+                <span class="pill-dot earnings-dot"></span>Earnings
+              </button>
+              <button class="sentiment-pill pill-policy" data-sentiment="POLICY">
+                <span class="pill-dot policy-dot"></span>Policy/RBI
+              </button>
+            </div>
+
+            <!-- Instant Search Input -->
+            <div class="search-box">
+              <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="searchInput" placeholder="Search Sensex, Nifty, stocks, RBI..." autocomplete="off">
+              <button class="clear-search-btn hidden" id="clearSearchBtn" aria-label="Clear Search">✕</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Active Filter Chips Summary (if any) -->
+      <div class="active-query-bar hidden" id="activeQueryBar">
+        <span class="active-query-text" id="activeQueryText"></span>
+        <button class="btn-reset-filters" id="resetFiltersBtn">Reset All</button>
+      </div>
+
+      <!-- Dedicated Key Events & Economic Calendar Container (Visible when Key Events Tab is active) -->
+      <div class="events-wrapper hidden" id="eventsWrapper">
+        <!-- Sub-Navigation Switcher (Economic / Holidays / Policy Decisions) -->
+        <div class="calendar-header-bar">
+          <div class="calendar-subnav" role="tablist">
+            <button class="calendar-subtab active" data-subtab="economic" role="tab" aria-selected="true">
+              📊 Economic Calendar (<span id="countEconomicCal">0</span>)
+            </button>
+            <button class="calendar-subtab" data-subtab="holidays" role="tab" aria-selected="false">
+              🏖️ Holiday Calendar (<span id="countHolidaysCal">0</span>)
+            </button>
+            <button class="calendar-subtab" data-subtab="policy" role="tab" aria-selected="false">
+              🏛️ Policy Decisions (<span id="countPolicyCal">0</span>)
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Controls Bar (Country, Impact, Search) -->
+        <div class="calendar-controls" id="calendarControlsBar">
+          <div class="calendar-filters-left">
+            <span class="calendar-filter-label">FILTERS:</span>
+            <!-- Country Dropdown Filter -->
+            <div class="calendar-select-wrap">
+              <select id="calendarCountryFilter" class="calendar-select" aria-label="Filter by Country">
+                <option value="All">All Countries (IND, USA, JPN, CHN)</option>
+                <option value="India">🇮🇳 India</option>
+                <option value="USA">🇺🇸 USA</option>
+                <option value="Japan">🇯🇵 Japan</option>
+                <option value="China">🇨🇳 China</option>
+              </select>
+            </div>
+
+            <!-- Impact Dropdown Filter -->
+            <div class="calendar-select-wrap">
+              <select id="calendarImpactFilter" class="calendar-select" aria-label="Filter by Impact">
+                <option value="All">All Impacts</option>
+                <option value="High">🔴 High Impact</option>
+                <option value="Medium">🟡 Medium Impact</option>
+                <option value="Low">🔵 Low Impact</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="calendar-filters-right">
+            <div class="calendar-date-pill">
+              <span>⚡ LIVE MACRO STREAM</span>
+            </div>
+            <div class="calendar-search-wrap">
+              <input type="text" id="calendarSearchInput" placeholder="Filter PMI, GDP, CPI, Fed..." autocomplete="off">
+            </div>
+          </div>
+        </div>
+
+        <!-- 1. Economic Calendar Table View -->
+        <div class="calendar-view-pane" id="paneEconomic">
+          <div class="calendar-table-wrap">
+            <table class="economic-calendar-table">
+              <thead>
+                <tr>
+                  <th style="width: 140px;">Date & Time</th>
+                  <th style="width: 130px;">Country</th>
+                  <th>Event</th>
+                  <th style="width: 110px; text-align: center;">Impact</th>
+                  <th style="width: 95px; text-align: right;">Expected</th>
+                  <th style="width: 95px; text-align: right;">Actual</th>
+                  <th style="width: 95px; text-align: right;">Previous</th>
+                  <th style="width: 120px; text-align: center;">More</th>
+                </tr>
+              </thead>
+              <tbody id="economicCalendarTbody">
+                <!-- Dynamically populated rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 2. Holidays Calendar View -->
+        <div class="calendar-view-pane hidden" id="paneHolidays">
+          <div class="calendar-table-wrap">
+            <table class="economic-calendar-table holiday-table">
+              <thead>
+                <tr>
+                  <th style="width: 140px;">Trading Date</th>
+                  <th style="width: 120px;">Day</th>
+                  <th>Holiday / Description</th>
+                  <th style="width: 140px;">Exchange</th>
+                  <th style="width: 120px; text-align: center;">Status</th>
+                </tr>
+              </thead>
+              <tbody id="holidaysCalendarTbody">
+                <!-- Dynamically populated rows -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 3. Policy Decisions Cards View -->
+        <div class="calendar-view-pane hidden" id="panePolicy">
+          <div class="events-grid" id="eventsGrid">
+            <!-- Dynamically populated policy cards -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Feed Container -->
+      <div class="feed-wrapper" id="feedWrapper">
+        <!-- Skeleton Loading State -->
+        <div class="skeleton-grid" id="skeletonGrid">
+          <div class="news-card skeleton-card"></div>
+          <div class="news-card skeleton-card"></div>
+          <div class="news-card skeleton-card"></div>
+          <div class="news-card skeleton-card"></div>
+          <div class="news-card skeleton-card"></div>
+          <div class="news-card skeleton-card"></div>
+        </div>
+
+        <!-- Real Cards Stream -->
+        <div class="news-grid hidden" id="newsGrid"></div>
+
+        <!-- Empty State -->
+        <div class="empty-state hidden" id="emptyState">
+          <div class="empty-icon">📰</div>
+          <h3 class="empty-title">No matching market updates</h3>
+          <p class="empty-desc">Try clearing your search query or selecting a different source/signal filter.</p>
+          <button class="btn-primary" id="emptyResetBtn">Show All Stories</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <div class="footer-left">
+          <p class="footer-brand"><strong>ZEROLIVE</strong> — Live Market News, every Minute</p>
+          <div class="footer-links">
+            <a href="/" class="footer-link">⚡ Live Terminal</a>
+            <span class="footer-dot">•</span>
+            <a href="/about" class="footer-link">ℹ️ About ZeroLive</a>
+            <span class="footer-dot">•</span>
+            <a href="/about#sources" class="footer-link">📡 Data Sources</a>
+            <span class="footer-dot">•</span>
+            <a href="/about#disclaimer" class="footer-link">⚠️ SEBI & Legal Disclaimer</a>
+            <span class="footer-dot">•</span>
+            <a href="/about#contact" class="footer-link">📬 Support</a>
+          </div>
+          <p class="footer-sources">Aggregating real-time public feeds & statutory filings from NSE India, BSE India, Moneycontrol, Economic Times, Business Standard, LiveMint, Reuters, CNBC, and Yahoo Finance.</p>
+          <p class="footer-disclaimer">Disclaimer: For educational & informational purposes only. Non-advisory platform. Not registered with SEBI. All outbound links point directly to original sources.</p>
+        </div>
+        <div class="footer-right">
+          <span class="badge-deploy">RENDER 24/7 CLOUD READY</span>
+          <span class="footer-copyright">Updated Continuously via Autonomous Cron</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Global Dropdown Backdrop for Mobile & Desktop -->
+  <div class="dropdown-backdrop hidden" id="dropdownBackdrop"></div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Floating Back to Top Button -->
+  <button class="btn-back-top hidden" id="backToTopBtn" aria-label="Back to top">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="18 15 12 9 6 15"></polyline>
+    </svg>
+  </button>
+
+  <!-- 3-Bullet Instant Takeaway Modal -->
+  <div class="modal-overlay hidden" id="tldrModalOverlay">
+    <div class="modal-card">
+      <div class="drawer-handle-bar"></div>
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge">⚡ 3-BULLET TAKEAWAY</span>
+          <h3 class="modal-title" id="tldrModalTitle">Loading Takeaways...</h3>
+        </div>
+        <button class="modal-close-btn" id="tldrModalCloseBtn" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="tldr-bullets" id="tldrBulletsList">
+          <!-- Dynamically inserted bullets -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-listen-modal" id="tldrListenBtn">
+          <span>🔊</span> <span id="tldrListenText">Listen to Takeaway</span>
+        </button>
+        <a href="#" target="_blank" class="btn-primary-modal" id="tldrReadFullBtn">Read Full Story ↗</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Share Modal -->
+  <div class="modal-overlay hidden" id="shareModalOverlay">
+    <div class="modal-card modal-share">
+      <div class="drawer-handle-bar"></div>
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-badge">📲 SHARE NEWS</span>
+          <h3 class="modal-title" id="shareModalTitle">Share to Trading Groups</h3>
+        </div>
+        <button class="modal-close-btn" id="shareModalCloseBtn" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="share-preview-text" id="sharePreviewText">Loading preview...</p>
+        <div class="share-options-grid">
+          <a href="#" target="_blank" class="share-btn share-whatsapp" id="shareWhatsAppBtn">
+            <span class="share-icon">🟢</span>
+            <span class="share-label">Share to WhatsApp</span>
+          </a>
+          <a href="#" target="_blank" class="share-btn share-telegram" id="shareTelegramBtn">
+            <span class="share-icon">🔵</span>
+            <span class="share-label">Share to Telegram</span>
+          </a>
+          <button class="share-btn share-copy" id="shareCopyLinkBtn">
+            <span class="share-icon">📋</span>
+            <span class="share-label" id="shareCopyLabel">Copy Trading Alert</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=4.6"></script>
+</body>
+</html>

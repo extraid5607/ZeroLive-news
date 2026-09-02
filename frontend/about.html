@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>About ZeroLive – Mission, Data Sources & Legal Disclaimers</title>
+  <meta name="description" content="Learn about ZeroLive: Autonomous real-time financial intelligence terminal, official NSE/BSE filing aggregation, newsroom feeds, SEBI compliance, and regulatory disclaimers.">
+  <link rel="canonical" href="https://zerolive.in/about">
+
+  <!-- PWA Web App Manifest & Theme Color -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0a0c">
+
+  <!-- iOS PWA Specific Meta Tags -->
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="ZeroLive">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700;800&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/style.css?v=4.7">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+
+  <style>
+    /* About Page Specific Layout */
+    .about-wrapper {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 2.5rem 1.25rem 4rem;
+    }
+    .about-hero {
+      text-align: center;
+      margin-bottom: 3rem;
+    }
+    .about-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.85rem;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 9999px;
+      color: #38bdf8;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      margin-bottom: 1.25rem;
+    }
+    .about-title {
+      font-family: var(--font-display);
+      font-size: 2.6rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+    .about-subtitle {
+      font-size: 1.12rem;
+      color: var(--text-secondary);
+      max-width: 720px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+    .about-section {
+      background: var(--bg-surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+    [data-theme="light"] .about-section {
+      background: #ffffff;
+      border-color: #cbd5e1;
+      box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+    }
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 0.85rem;
+    }
+    [data-theme="light"] .section-header {
+      border-bottom-color: #e2e8f0;
+    }
+    .section-icon {
+      font-size: 1.5rem;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .about-p {
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.7;
+      margin-bottom: 1.1rem;
+    }
+    .about-grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+    }
+    .feature-box {
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 1.25rem;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .feature-box:hover {
+      border-color: #38bdf8;
+      transform: translateY(-2px);
+    }
+    [data-theme="light"] .feature-box {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+    [data-theme="light"] .feature-box:hover {
+      border-color: #0284c7;
+      background: #ffffff;
+    }
+    .feature-box h4 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .feature-box p {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+    .sources-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin: 1.25rem 0;
+    }
+    .source-tag {
+      padding: 0.4rem 0.85rem;
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border-active);
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    [data-theme="light"] .source-tag {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+      color: #0f172a;
+    }
+    /* Legal Disclaimer Box */
+    .disclaimer-card {
+      background: rgba(239, 68, 68, 0.06);
+      border: 2px solid rgba(239, 68, 68, 0.4);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 24px rgba(239, 68, 68, 0.1);
+    }
+    [data-theme="light"] .disclaimer-card {
+      background: #fff5f5;
+      border-color: #fca5a5;
+    }
+    .disclaimer-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      color: #ef4444;
+      font-size: 1.35rem;
+      font-weight: 800;
+      font-family: var(--font-display);
+      margin-bottom: 1.25rem;
+    }
+    .disclaimer-item {
+      margin-bottom: 1.15rem;
+    }
+    .disclaimer-item strong {
+      display: block;
+      color: var(--text-primary);
+      font-size: 0.96rem;
+      margin-bottom: 0.35rem;
+    }
+    .disclaimer-item p {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+    .cta-terminal-wrap {
+      text-align: center;
+      margin: 3rem 0 1rem;
+    }
+    .btn-cta-terminal {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.85rem 2rem;
+      background: #0284c7;
+      color: #ffffff;
+      font-family: var(--font-mono);
+      font-size: 0.95rem;
+      font-weight: 800;
+      border-radius: 8px;
+      text-decoration: none;
+      box-shadow: 0 4px 16px rgba(2, 132, 199, 0.4);
+      transition: all 0.2s ease;
+    }
+    .btn-cta-terminal:hover {
+      background: #0369a1;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(2, 132, 199, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation -->
+    <header class="top-nav">
+      <div class="nav-container">
+        <div class="brand-section">
+          <a href="/" style="text-decoration: none; display: flex; align-items: center; gap: 0.85rem;">
+            <div class="brand-logo">
+              <svg class="zerolive-logo-svg" width="38" height="38" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="24" cy="24" r="19" class="logo-circle-ring" stroke="currentColor" stroke-width="2.2" />
+                <path d="M6 24H16L19.5 12L25.5 35L29 18L32 24H42" stroke="#00e676" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+                <circle cx="37.5" cy="10.5" r="4.2" fill="#ef4444" />
+              </svg>
+            </div>
+            <div class="brand-text">
+              <h1 class="brand-title">Zero<span class="accent-live">Live</span></h1>
+              <p class="brand-tagline">Live market news, every minute</p>
+            </div>
+          </a>
+        </div>
+
+        <div class="market-meta-section">
+          <!-- Live IST Clock -->
+          <div class="live-clock-pill" id="liveClockPill" title="Live Indian Standard Time (IST)">
+            <span class="clock-pulse-dot"></span>
+            <span class="clock-label">IST:</span>
+            <span class="clock-time font-mono" id="liveClockText">--:--:--</span>
+          </div>
+
+          <!-- Market Status -->
+          <div class="market-status-pill" id="marketStatusPill">
+            <span class="status-dot" id="marketStatusDot"></span>
+            <span class="status-text" id="marketStatusText">CHECKING...</span>
+          </div>
+
+          <!-- Navigation Controls -->
+          <div class="sync-controls">
+            <a href="/" class="btn-nav-about" title="Return to Live Trading Feed">← Live Terminal</a>
+            <button class="btn-theme-toggle" id="themeToggleBtn" title="Toggle Dark/Light Theme" aria-label="Toggle Theme">
+              <span class="theme-icon theme-icon-dark">🌙</span>
+              <span class="theme-icon theme-icon-light hidden">☀️</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="about-wrapper">
+      <!-- Hero Header -->
+      <div class="about-hero">
+        <span class="about-badge">⚡ 24/7 AUTONOMOUS MARKET INTELLIGENCE</span>
+        <h2 class="about-title">About ZeroLive</h2>
+        <p class="about-subtitle">
+          ZeroLive is an autonomous, high-frequency financial news terminal designed to eliminate market noise, clickbait, and artificial delays for retail traders and financial market participants.
+        </p>
+      </div>
+
+      <!-- Mission Statement -->
+      <section class="about-section">
+        <div class="section-header">
+          <span class="section-icon">🎯</span>
+          <h3 class="section-title">Our Mission</h3>
+        </div>
+        <p class="about-p">
+          In modern financial markets, news velocity dictates capital outcomes. Institutional trading desks possess direct feeds from exchange terminals, news wires, and regulatory portals. In contrast, retail investors often rely on mainstream media portals cluttered with invasive advertisements, paywalls, and editorial delay.
+        </p>
+        <p class="about-p">
+          <strong>ZeroLive was engineered to bridge this gap.</strong> By continuously monitoring official regulatory disclosure endpoints from the National Stock Exchange of India (NSE) and BSE Limited (BSE), alongside leading global and domestic financial newsrooms, ZeroLive aggregates, categorizes, and streams market-moving developments with sub-minute latency directly to your screen.
+        </p>
+      </section>
+
+      <!-- Key Capabilities Grid -->
+      <section class="about-section">
+        <div class="section-header">
+          <span class="section-icon">⚙️</span>
+          <h3 class="section-title">How ZeroLive Works</h3>
+        </div>
+        <div class="about-grid-3">
+          <div class="feature-box">
+            <h4>⚡ Sub-Minute Ingestion</h4>
+            <p>Our autonomous backend polls over a dozen public RSS streams and direct statutory exchange disclosure APIs every minute, 24 hours a day, 7 days a week.</p>
+          </div>
+          <div class="feature-box">
+            <h4>🏛️ Direct NSE & BSE Filings</h4>
+            <p>Monitors official corporate disclosure announcements directly from NSE and BSE, isolating quarterly financial results from routine administrative filings.</p>
+          </div>
+          <div class="feature-box">
+            <h4>🎯 Strict Significance Engine</h4>
+            <p>Separates critical, market-altering events (rate decisions, circuit limits, regulatory probes, crashes, surges) from repetitive chatter so you never miss what matters.</p>
+          </div>
+          <div class="feature-box">
+            <h4>📊 4-Country Macro Calendar</h4>
+            <p>Tracks GDP, CPI, Inflation, PMI, Jobless Claims, and Policy Decisions strictly filtered to the 4 core market movers: India 🇮🇳, USA 🇺🇸, Japan 🇯🇵, and China 🇨🇳.</p>
+          </div>
+          <div class="feature-box">
+            <h4>🔔 Native Web Push Alerts</h4>
+            <p>Zero-dependency Web Push notification architecture delivering real-time desktop and mobile trading alerts directly through your browser without third-party apps.</p>
+          </div>
+          <div class="feature-box">
+            <h4>📱 Installable PWA</h4>
+            <p>Full Progressive Web App compatibility. Install ZeroLive on iOS Safari or Android Chrome for a native, standalone, full-screen trading desk experience.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Data Sources & Transparency -->
+      <section class="about-section" id="sources">
+        <div class="section-header">
+          <span class="section-icon">📡</span>
+          <h3 class="section-title">Data Sources & Editorial Transparency</h3>
+        </div>
+        <p class="about-p">
+          ZeroLive operates as a pure data aggregator and indexing engine. All news articles, corporate filings, headlines, and publication links originate from publicly available syndication channels, including:
+        </p>
+        <div class="sources-list">
+          <span class="source-tag">🏛️ National Stock Exchange of India (NSE)</span>
+          <span class="source-tag">🏛️ BSE Limited (BSE India)</span>
+          <span class="source-tag">📰 The Economic Times</span>
+          <span class="source-tag">📰 Business Standard</span>
+          <span class="source-tag">📰 LiveMint</span>
+          <span class="source-tag">📰 Moneycontrol</span>
+          <span class="source-tag">🌍 Reuters Markets</span>
+          <span class="source-tag">🌍 Financial Times</span>
+          <span class="source-tag">🌍 CNBC International</span>
+          <span class="source-tag">🌍 Yahoo Finance</span>
+        </div>
+        <p class="about-p">
+          <strong>Intellectual Property & Outbound Links:</strong> All headlines, publication names, trademarks, and story snippets belong exclusively to their respective publishers and exchanges. ZeroLive always provides direct outbound links pointing to original articles and official PDF statutory filings. We do not monetize, gate, or claim ownership of third-party intellectual property.
+        </p>
+      </section>
+
+      <!-- Critical Financial & Regulatory Disclaimer (SEBI Compliance) -->
+      <section class="disclaimer-card" id="disclaimer">
+        <div class="disclaimer-header">
+          <span>⚠️</span>
+          <span>Regulatory Disclosure & Legal Disclaimer</span>
+        </div>
+
+        <div class="disclaimer-item">
+          <strong>1. Educational & Informational Purpose Only</strong>
+          <p>
+            ZeroLive is an automated software and news aggregation technology. All content, data points, market index feeds, and algorithmic indicators (including tags such as "Bullish", "Bearish", "Earnings", or "Important") provided on this platform are strictly for informational and educational purposes. Nothing on ZeroLive constitutes financial advice, investment advice, trading recommendations, or an endorsement of any security, company, or financial instrument.
+          </p>
+        </div>
+
+        <div class="disclaimer-item">
+          <strong>2. Non-Registration with SEBI</strong>
+          <p>
+            ZeroLive, its creators, operators, and developers are <strong>NOT registered with the Securities and Exchange Board of India (SEBI)</strong> as Research Analysts (RA) under the SEBI (Research Analysts) Regulations, 2014, nor as Investment Advisers (RIA) under the SEBI (Investment Advisers) Regulations, 2013. We do not issue stock tips, target prices, buy/sell recommendations, or portfolio management services.
+          </p>
+        </div>
+
+        <div class="disclaimer-item">
+          <strong>3. Capital Risk & Due Diligence</strong>
+          <p>
+            Trading and investing in equities, derivatives (Futures & Options - F&O), commodities, and foreign exchange involve significant financial risk. Market prices are volatile, and market participants risk substantial or total loss of invested capital. You must conduct your own independent research and consult a certified, SEBI-registered financial advisor before executing any trade or investment decision.
+          </p>
+        </div>
+
+        <div class="disclaimer-item">
+          <strong>4. Data Timeliness & Limitation of Liability</strong>
+          <p>
+            While ZeroLive employs high-frequency automated workers to fetch public disclosures promptly, we do not warrant the timeliness, completeness, or absolute accuracy of third-party feeds. Network latency, external feed downtime, or source revisions may occur. In no event shall ZeroLive or its operators be held liable for any direct, indirect, consequential, or incidental losses or damages resulting from the use of this website.
+          </p>
+        </div>
+      </section>
+
+      <!-- Open Standards & Privacy -->
+      <section class="about-section">
+        <div class="section-header">
+          <span class="section-icon">🛡️</span>
+          <h3 class="section-title">Privacy & Open Standards</h3>
+        </div>
+        <p class="about-p">
+          We believe in a clean, professional web:
+        </p>
+        <ul style="margin-left: 1.5rem; color: var(--text-secondary); line-height: 1.8;">
+          <li><strong>No Tracking Cookies:</strong> We do not track you across the web or sell user analytics to third-party brokers.</li>
+          <li><strong>No Mandatory Sign-ups:</strong> ZeroLive is freely accessible without requiring accounts, passwords, or credit cards.</li>
+          <li><strong>Autonomous Web Push:</strong> Push subscriptions are stored strictly as encrypted browser keys with zero personal identifiers.</li>
+        </ul>
+      </section>
+
+      <!-- Contact / Support -->
+      <section class="about-section" id="contact">
+        <div class="section-header">
+          <span class="section-icon">📬</span>
+          <h3 class="section-title">Feedback & Support</h3>
+        </div>
+        <p class="about-p">
+          Have suggestions for new feeds, macro calendars, or bug reports? We welcome feedback from fellow traders and developers.
+        </p>
+        <p class="about-p">
+          Connect with us via our official project channels or reach out via email: 
+          <a href="mailto:Harjinder1070@gmail.com" style="color: #38bdf8; font-weight: 700; text-decoration: none;">Harjinder1070@gmail.com</a>
+        </p>
+      </section>
+
+      <!-- Return CTA -->
+      <div class="cta-terminal-wrap">
+        <a href="/" class="btn-cta-terminal">⚡ Return to ZeroLive Live Terminal</a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="footer-content">
+        <div class="footer-left">
+          <p class="footer-brand"><strong>ZEROLIVE</strong> — Live Market News, every Minute</p>
+          <p class="footer-sources">Aggregating statutory filings and public feeds from NSE India, BSE India, Economic Times, Business Standard, LiveMint, Reuters, and CNBC.</p>
+          <p class="footer-disclaimer">For educational purposes only. Outbound links point directly to official publications and regulatory disclosures.</p>
+        </div>
+        <div class="footer-right">
+          <span class="badge-deploy">PUBLIC 24/7 TERMINAL</span>
+          <span class="footer-copyright">© 2026 ZeroLive. All Rights Reserved.</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Simple theme switcher and clock for about page
+    (function() {
+      const themeBtn = document.getElementById('themeToggleBtn');
+      const clockEl = document.getElementById('liveClockText');
+      const statusPill = document.getElementById('marketStatusPill');
+      const statusText = document.getElementById('marketStatusText');
+
+      // Theme
+      function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        const isLight = theme === 'light';
+        const darkIcon = document.querySelector('.theme-icon-dark');
+        const lightIcon = document.querySelector('.theme-icon-light');
+        if (darkIcon && lightIcon) {
+          darkIcon.classList.toggle('hidden', isLight);
+          lightIcon.classList.toggle('hidden', !isLight);
+        }
+      }
+
+      const savedTheme = localStorage.getItem('dalal_theme') || 'dark';
+      applyTheme(savedTheme);
+
+      if (themeBtn) {
+        themeBtn.addEventListener('click', function() {
+          const current = document.documentElement.getAttribute('data-theme');
+          const next = current === 'light' ? 'dark' : 'light';
+          localStorage.setItem('dalal_theme', next);
+          applyTheme(next);
+        });
+      }
+
+      // IST Clock & Market Status
+      function updateClock() {
+        const now = new Date();
+        const istOffset = 5.5 * 60 * 60 * 1000;
+        const istDate = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + istOffset);
+        
+        const hours = istDate.getHours();
+        const mins = istDate.getMinutes();
+        const secs = istDate.getSeconds();
+        const timeStr = [hours, mins, secs].map(v => String(v).padStart(2, '0')).join(':');
+        
+        if (clockEl) clockEl.textContent = timeStr;
+
+        // Market status (09:15 - 15:30 IST Mon-Fri)
+        const day = istDate.getDay();
+        const isWeekday = day >= 1 && day <= 5;
+        const currentMins = hours * 60 + mins;
+        const isOpen = isWeekday && currentMins >= (9 * 60 + 15) && currentMins < (15 * 60 + 30);
+
+        if (statusPill && statusText) {
+          if (isOpen) {
+            statusPill.className = 'market-status-pill open';
+            statusText.textContent = 'NSE/BSE OPEN';
+          } else {
+            statusPill.className = 'market-status-pill closed';
+            statusText.textContent = 'NSE/BSE CLOSED';
+          }
+        }
+      }
+
+      updateClock();
+      setInterval(updateClock, 1000);
+    })();
+  </script>
+</body>
+</html>
