@@ -36,6 +36,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# HTTP Security Headers Middleware (A+ Grade Security Protection)
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # 1. HSTS (Strict-Transport-Security) - Enforce HTTPS for 1 year
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+    # 2. CSP (Content-Security-Policy) - Protect against XSS and data injection
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https:; "
+        "style-src 'self' 'unsafe-inline' https:; "
+        "img-src 'self' data: https: blob:; "
+        "font-src 'self' data: https:; "
+        "connect-src 'self' https: wss:; "
+        "manifest-src 'self'; "
+        "frame-ancestors 'self';"
+    )
+    # 3. Prevent MIME-type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # 4. Clickjacking protection
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    # 5. Referrer Policy
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # 6. Permissions Policy - Disable unused dangerous browser APIs
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()"
+    # 7. Cross-Origin Opener Policy (COOP)
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    # 8. Mask server fingerprint
+    response.headers["Server"] = "ZeroLive-Secure-Edge"
+    return response
+
 # Path to frontend directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
