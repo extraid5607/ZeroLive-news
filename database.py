@@ -148,9 +148,12 @@ def init_db():
             except Exception:
                 pass
 
-        # Cleanup legacy stale articles older than 14 days (e.g. outdated 861d Moneycontrol XML entries)
+        # Cleanup legacy stale articles older than 90 days (preserves 3 months for SEO & sharing)
         try:
-            cur.execute("DELETE FROM articles WHERE published_at < datetime('now', '-14 days');")
+            if is_postgres():
+                cur.execute("DELETE FROM articles WHERE published_at < NOW() - INTERVAL '90 days';")
+            else:
+                cur.execute("DELETE FROM articles WHERE published_at < datetime('now', '-90 days');")
         except Exception:
             pass
 
@@ -295,6 +298,87 @@ def mark_article_as_pushed(article_id: int):
             cur.execute("UPDATE articles SET pushed = 1 WHERE id = ?;", (article_id,))
             cur.execute("UPDATE articles SET pushed = 1 WHERE type = 'important' AND (pushed IS NULL OR pushed = 0);")
         conn.commit()
+    finally:
+        conn.close()
+
+def get_article_by_id(article_id: int) -> Optional[Dict[str, Any]]:
+    """Retrieves a single article by its database ID."""
+    init_db()
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        query = """
+            SELECT id, title, link, source, feed_name, description, published_at, published_str, sentiment, category, type, pushed, created_at
+            FROM articles
+            WHERE id = %s
+        """ if is_postgres() else """
+            SELECT id, title, link, source, feed_name, description, published_at, published_str, sentiment, category, type, pushed, created_at
+            FROM articles
+            WHERE id = ?
+        """
+        cur.execute(query, (article_id,))
+        row = cur.fetchone()
+        if row:
+            if hasattr(row, 'keys'):
+                return dict(row)
+            return {
+                "id": row[0],
+                "title": row[1],
+                "link": row[2],
+                "source": row[3],
+                "feed_name": row[4],
+                "description": row[5],
+                "published_at": str(row[6]),
+                "published_str": row[7],
+                "sentiment": row[8],
+                "category": row[9],
+                "type": row[10],
+                "pushed": row[11],
+                "created_at": str(row[12]) if row[12] else None
+            }
+        return None
+    finally:
+        conn.close()
+
+def get_related_articles(current_id: int, limit: int = 5) -> List[Dict[str, Any]]:
+    """Retrieves latest related articles excluding the current article."""
+    init_db()
+    conn = get_db_connection()
+    articles = []
+    try:
+        cur = conn.cursor()
+        query = """
+            SELECT id, title, link, source, feed_name, published_at, published_str, sentiment, category, type
+            FROM articles
+            WHERE id != %s
+            ORDER BY published_at DESC
+            LIMIT %s
+        """ if is_postgres() else """
+            SELECT id, title, link, source, feed_name, published_at, published_str, sentiment, category, type
+            FROM articles
+            WHERE id != ?
+            ORDER BY published_at DESC
+            LIMIT ?
+        """
+        cur.execute(query, (current_id, limit))
+        rows = cur.fetchall()
+        for r in rows:
+            if hasattr(r, 'keys'):
+                articles.append(dict(r))
+            else:
+                articles.append({
+                    "id": r[0],
+                    "title": r[1],
+                    "link": r[2],
+                    "source": r[3],
+                    "feed_name": r[4],
+                    "published_at": str(r[5]),
+                    "published_str": r[6],
+                    "sentiment": r[7],
+                    "category": r[8],
+                    "type": r[9]
+                })
+        return articles
     finally:
         conn.close()
 

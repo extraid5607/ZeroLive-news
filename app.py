@@ -11,8 +11,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, PlainTextResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-from database import get_articles, get_stats, init_db, get_key_events, insert_key_event, delete_key_event
+from database import get_articles, get_stats, init_db, get_key_events, insert_key_event, delete_key_event, get_article_by_id, get_related_articles
 from fetch_news import fetch_and_store_all_news, fetch_live_economic_calendar, fetch_live_market_holidays
+from article_template import slugify_title, render_article_html, render_not_found_html
 
 logging.basicConfig(
     level=logging.INFO,
@@ -172,6 +173,24 @@ async def serve_about():
             return HTMLResponse(content=f.read(), media_type="text/html")
     return HTMLResponse("<h1>ZeroLive About Page Not Found</h1>", status_code=404)
 
+@app.get("/news/{article_id}", response_class=HTMLResponse)
+@app.get("/news/{article_id}/{slug}", response_class=HTMLResponse)
+async def serve_article_page(article_id: int, slug: Optional[str] = None):
+    """
+    Dedicated SEO & Social Sharing Article Page.
+    Serves full on-site clean reader with source attribution, WhatsApp Open Graph cards, and JSON-LD schema.
+    """
+    article = await asyncio.to_thread(get_article_by_id, article_id)
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://zerolivenews.onrender.com").rstrip("/")
+
+    if not article:
+        not_found_html = render_not_found_html(base_url)
+        return HTMLResponse(content=not_found_html, status_code=404)
+
+    related = await asyncio.to_thread(get_related_articles, article_id, 6)
+    html_content = render_article_html(article, related, base_url)
+    return HTMLResponse(content=html_content, media_type="text/html")
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 async def serve_robots():
     """Returns robots.txt for search engine crawlers."""
@@ -179,24 +198,36 @@ async def serve_robots():
     if os.path.exists(robots_file):
         with open(robots_file, "r", encoding="utf-8") as f:
             return PlainTextResponse(f.read(), media_type="text/plain")
-    return PlainTextResponse("User-agent: *\nAllow: /\nSitemap: https://zerolive.in/sitemap.xml\n", media_type="text/plain")
+    return PlainTextResponse("User-agent: *\nAllow: /\nSitemap: https://zerolivenews.onrender.com/sitemap.xml\n", media_type="text/plain")
 
 @app.get("/sitemap.xml")
 async def serve_sitemap():
-    """Generates and returns live dynamic sitemap XML."""
-    xml_content = """<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>https://zerolive.in/</loc>
+    """Generates and returns live dynamic sitemap XML with latest articles."""
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://zerolivenews.onrender.com").rstrip("/")
+    articles = await asyncio.to_thread(get_articles, None, None, None, None, 100, 0)
+
+    xml_entries = [
+        f"""  <url>
+    <loc>{base_url}/</loc>
     <changefreq>always</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://zerolive.in/about</loc>
+    <loc>{base_url}/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
-  </url>
-</urlset>"""
+  </url>"""
+    ]
+
+    for art in articles:
+        slug = slugify_title(art.get("title", ""))
+        xml_entries.append(f"""  <url>
+    <loc>{base_url}/news/{art['id']}/{slug}</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>""")
+
+    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(xml_entries) + "\n</urlset>"
     return Response(content=xml_content, media_type="application/xml")
 
 @app.get("/preview.png")
