@@ -827,12 +827,14 @@
   function openShareModal(article) {
     state.activeModalArticle = article;
     const sentimentTag = article.sentiment ? `[${article.sentiment}] ` : '';
-    const shareText = `⚡ ${sentimentTag}${article.title}\n\n📰 Source: ${article.source}\n⚡ ZeroLive: ${article.link}`;
+    const slug = slugify(article.title);
+    const storyUrl = `${window.location.origin}/news/${article.id}/${slug}`;
+    const shareText = `⚡ ${sentimentTag}${article.title}\n\n📰 Source: ${article.source}\n📊 Full Story: ${storyUrl}\n\nZeroLive – Live Market News, Every Minute`;
 
     dom.sharePreviewText.textContent = shareText;
     dom.shareWhatsAppBtn.href = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-    dom.shareTelegramBtn.href = `https://t.me/share/url?url=${encodeURIComponent(article.link)}&text=${encodeURIComponent(`⚡ ${sentimentTag}${article.title} | ZeroLive`)}`;
-    dom.shareCopyLabel.textContent = 'Copy Trading Alert';
+    dom.shareTelegramBtn.href = `https://t.me/share/url?url=${encodeURIComponent(storyUrl)}&text=${encodeURIComponent(`⚡ ${sentimentTag}${article.title} | Source: ${article.source}`)}`;
+    dom.shareCopyLabel.textContent = 'Copy ZeroLive Link';
 
     dom.shareModalOverlay.classList.remove('hidden');
   }
@@ -1207,6 +1209,15 @@
     return map[sentiment] || '';
   }
 
+  function slugify(text) {
+    if (!text) return 'market-news';
+    return text.toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .trim()
+      .replace(/[\s-]+/g, '-')
+      .slice(0, 80) || 'market-news';
+  }
+
   function escapeHtml(text) {
     if (!text) return '';
     const div = document.createElement('div');
@@ -1244,11 +1255,18 @@
       const isStarred = isBookmarked(art.link);
       const cardId = `art_${index}_${Math.abs(art.title.length * 31)}`;
 
+      const artSlug = slugify(art.title);
+      const onSiteUrl = `/news/${art.id}/${artSlug}`;
+
       let linkText = 'Read Story';
+      let targetHref = onSiteUrl;
+      let targetAttr = '';
       if (isPdf) {
-        linkText = 'View Official PDF Filing';
+        linkText = 'View Official PDF Filing ↗';
+        targetHref = encodeURI(art.link);
+        targetAttr = 'target="_blank" rel="noopener noreferrer"';
       } else if (isExchange) {
-        linkText = 'View Exchange Filing';
+        linkText = 'Read Filing on ZeroLive';
       }
 
       const tickers = extractStockTickers(art.title, art.description || '');
@@ -1269,7 +1287,7 @@
           <div class="card-body">
             ${tickers.length > 0 ? `<div class="card-tickers">${tickerBadges}</div>` : ''}
             <h2 class="card-title">
-              <a href="${encodeURI(art.link)}" target="_blank" rel="noopener noreferrer">
+              <a href="${targetHref}" ${targetAttr}>
                 ${escapedTitle}
               </a>
             </h2>
@@ -1277,12 +1295,11 @@
           </div>
 
           <footer class="card-footer">
-            <a href="${encodeURI(art.link)}" target="_blank" rel="noopener noreferrer" class="card-link-out ${isPdf ? 'link-pdf' : ''}">
+            <a href="${targetHref}" ${targetAttr} class="card-link-out ${isPdf ? 'link-pdf' : ''}">
               ${linkText}
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                <polyline points="15 3 21 3 21 9"></polyline>
-                <line x1="10" y1="14" x2="21" y2="3"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+                <polyline points="12 5 19 12 12 19"></polyline>
               </svg>
             </a>
             <div class="card-actions">
@@ -1617,13 +1634,15 @@
       dom.shareCopyLinkBtn.addEventListener('click', () => {
         if (!state.activeModalArticle) return;
         const sentimentTag = state.activeModalArticle.sentiment ? `[${state.activeModalArticle.sentiment}] ` : '';
-        const text = `⚡ ${sentimentTag}${state.activeModalArticle.title}\n\n📰 Source: ${state.activeModalArticle.source}\n🔗 ${state.activeModalArticle.link}`;
+        const slug = slugify(state.activeModalArticle.title);
+        const storyUrl = `${window.location.origin}/news/${state.activeModalArticle.id}/${slug}`;
+        const text = `⚡ ${sentimentTag}${state.activeModalArticle.title}\n\n📰 Source: ${state.activeModalArticle.source}\n📊 Full Story: ${storyUrl}\n\nZeroLive – Live Market News, Every Minute`;
         if (navigator.clipboard) {
           navigator.clipboard.writeText(text).then(() => {
             dom.shareCopyLabel.textContent = '✅ Copied to Clipboard!';
-            showToast('Trading alert copied to clipboard!', '📋');
+            showToast('ZeroLive story link copied to clipboard!', '📋');
             setTimeout(() => {
-              if (dom.shareCopyLabel) dom.shareCopyLabel.textContent = 'Copy Trading Alert';
+              if (dom.shareCopyLabel) dom.shareCopyLabel.textContent = 'Copy ZeroLive Link';
             }, 2000);
           });
         }
