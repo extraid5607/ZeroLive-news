@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from database import get_articles, get_stats, init_db, get_key_events, insert_key_event, delete_key_event, get_article_by_id, get_related_articles
 from fetch_news import fetch_and_store_all_news, fetch_live_economic_calendar, fetch_live_market_holidays
-from article_template import slugify_title, render_article_html, render_not_found_html
+from article_template import slugify_title, render_article_html, render_not_found_html, get_article_translation_payload
 
 logging.basicConfig(
     level=logging.INFO,
@@ -190,6 +190,18 @@ async def serve_article_page(article_id: int, slug: Optional[str] = None):
     related = await asyncio.to_thread(get_related_articles, article_id, 6)
     html_content = render_article_html(article, related, base_url)
     return HTMLResponse(content=html_content, media_type="text/html")
+
+@app.get("/api/article/{article_id}/translate")
+async def api_get_article_translation(article_id: int, lang: str = Query("pa", description="Target language code")):
+    """
+    Translates the article title, key takeaways, and story paragraphs into the target language (default Punjabi 'pa').
+    Results are cached in memory for instant delivery.
+    """
+    article = await asyncio.to_thread(get_article_by_id, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    data = await asyncio.to_thread(get_article_translation_payload, article, lang)
+    return JSONResponse(content=data)
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
 async def serve_robots():

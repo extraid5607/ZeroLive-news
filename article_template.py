@@ -2,6 +2,9 @@ import re
 import json
 import html
 import requests
+import urllib.request
+import urllib.parse
+import concurrent.futures
 from bs4 import BeautifulSoup
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
@@ -161,6 +164,169 @@ def get_story_paragraphs(url: str, title: str, desc: str, source: str, sentiment
         _STORY_CACHE.clear()
     _STORY_CACHE[cache_key] = paras
     return paras
+
+_ARTICLE_TRANSLATION_CACHE: Dict[str, Dict[str, Any]] = {}
+
+def translate_single_text(text: str, target_lang: str = 'pa') -> str:
+    """Translates a single string into the target language using Google Translate API."""
+    if not text or not text.strip():
+        return text
+    try:
+        url = 'https://clients5.google.com/translate_a/t?client=dict-chrome-ex&sl=en&tl=' + target_lang + '&q=' + urllib.parse.quote(text)
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        with urllib.request.urlopen(req, timeout=4.0) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+            if isinstance(data, list) and len(data) > 0:
+                return data[0] if isinstance(data[0], str) else text
+            elif isinstance(data, str):
+                return data
+            return text
+    except Exception:
+        return text
+
+PUNGLISH_COMMON_REPLACEMENTS = [
+    # Entities, Acronyms & Countries
+    (r'ਜ਼ੀਰੋਲਾਈਵ|ਜ਼ੀਰੋ ਲਾਈਵ', 'ZeroLive'),
+    (r'ਯੂਕੇ|ਯੂ\.ਕੇ\.', 'UK'),
+    (r'ਯੂਐਸਏ|ਯੂਐਸ|ਯੂ\.ਐੱਸ\.', 'US'),
+    (r'ਆਈਪੀਓ|ਆਈ\.ਪੀ\.ਓ\.', 'IPO'),
+    (r'ਬੀਐਸਈ|ਬੀ\.ਐਸ\.ਈ\.', 'BSE'),
+    (r'ਐਨਐਸਈ|ਐਨ\.ਐਸ\.ਈ\.', 'NSE'),
+    (r'ਸੈਂਸੈਕਸ', 'Sensex'),
+    (r'ਨਿਫਟੀ', 'Nifty'),
+    (r'ਜੀਡੀਪੀ', 'GDP'),
+    (r'ਈਵੀ', 'EV'),
+    (r'ਆਰਬੀਆਈ', 'RBI'),
+    (r'ਸੇਬੀ', 'SEBI'),
+
+    # Market Participants (Plurals first!)
+    (r'ਵਿਦੇਸ਼ੀ ਸੰਸਥਾਗਤ ਨਿਵੇਸ਼ਕਾਂ', 'Foreign Institutional Investors (FIIs)'),
+    (r'ਵਿਦੇਸ਼ੀ ਨਿਵੇਸ਼ਕਾਂ', 'Foreign Investors'),
+    (r'ਸੰਸਥਾਗਤ ਨਿਵੇਸ਼ਕਾਂ', 'Institutional Investors'),
+    (r'ਨਿਵੇਸ਼ਕਾਂ', 'Investors'),
+    (r'ਨਿਵੇਸ਼ਕ', 'Investor'),
+    (r'ਵਪਾਰੀਆਂ|ਟ੍ਰੇਡਰਾਂ', 'Traders'),
+    (r'ਵਪਾਰੀ|ਟ੍ਰੇਡਰ', 'Trader'),
+    (r'ਵਿਸ਼ਲੇਸ਼ਕਾਂ', 'Analysts'),
+    (r'ਵਿਸ਼ਲੇਸ਼ਕ', 'Analyst'),
+    (r'ਦਲਾਲਾਂ|ਦਲਾਲ', 'Brokers'),
+    (r'ਪ੍ਰਬੰਧਨ', 'Management'),
+
+    # Financial & Market Terms (Plurals first!)
+    (r'ਬਜ਼ਾਰਾਂ|ਮਾਰਕੀਟਾਂ', 'Markets'),
+    (r'ਬਜ਼ਾਰ|ਮਾਰਕੀਟ', 'Market'),
+    (r'ਸ਼ੇਅਰਾਂ|ਸ਼ੇਅਰ', 'Shares'),
+    (r'ਸਟਾਕਾਂ|ਸਟਾਕ', 'Stocks'),
+    (r'ਕੰਪਨੀਆਂ', 'Companies'),
+    (r'ਕੰਪਨੀ', 'Company'),
+    (r'ਬੈਂਕਾਂ|ਬੈਂਕ', 'Banks'),
+    (r'ਮੁਨਾਫੇ|ਮੁਨਾਫਾ', 'Profit'),
+    (r'ਨੁਕਸਾਨ', 'Loss'),
+    (r'ਵਪਾਰਕ|ਵਪਾਰ', 'Trading'),
+    (r'ਤਿਮਾਹੀਆਂ|ਤਿਮਾਹੀ', 'Quarter'),
+    (r'ਵਾਲੀਅਮ', 'Volume'),
+    (r'ਪਲੇਟਫਾਰਮ', 'Platform'),
+    (r'ਸੂਚੀਕਰਨ|ਸੂਚੀ', 'Listing'),
+    (r'ਪ੍ਰੀਮੀਅਮ', 'Premium'),
+    (r'ਡਿਸਕਾਊਂਟ', 'Discount'),
+    (r'ਰਿਪੋਰਟਾਂ|ਰਿਪੋਰਟ', 'Report'),
+    (r'ਫਾਈਲਿੰਗਾਂ|ਫਾਈਲਿੰਗ', 'Filings'),
+    (r'ਖੁਲਾਸੇ|ਖੁਲਾਸਾ', 'Disclosures'),
+    (r'ਟਰਮੀਨਲਾਂ|ਟਰਮੀਨਲ', 'Terminals'),
+    (r'ਡੈਸਕਾਂ|ਡੈਸਕ', 'Desk'),
+    (r'ਅੰਕਾਂ|ਅੰਕ', 'points'),
+    (r'ਸਹਾਇਤਾ ਪੱਧਰਾਂ|ਸਹਾਇਤਾ ਪੱਧਰ', 'Support levels'),
+    (r'ਵਿਰੋਧ ਪੱਧਰਾਂ|ਵਿਰੋਧ ਪੱਧਰ', 'Resistance levels'),
+    (r'ਖਰੀਦਦਾਰੀ', 'Buying'),
+    (r'ਵਿਕਰੀ', 'Selling'),
+    (r'ਰੈਲੀ', 'Rally'),
+    (r'ਗਤੀਸ਼ੀਲਤਾ|ਗਤੀ', 'Momentum'),
+    (r'ਡੈਰੀਵੇਟਿਵਜ਼|ਡੈਰੀਵੇਟਿਵ', 'Derivatives'),
+    (r'ਬੋਨਸ', 'Bonus'),
+    (r'ਲਾਭਅੰਸ਼', 'Dividend')
+]
+
+def to_conversational_punglish(text: str) -> str:
+    """Converts formal Gurmukhi into natural Conversational Punjabi + English."""
+    if not text:
+        return text
+    for pat, repl in PUNGLISH_COMMON_REPLACEMENTS:
+        text = re.sub(pat, repl, text, flags=re.IGNORECASE)
+    return text
+
+def get_article_translation_payload(article: Dict[str, Any], lang: str = 'pa') -> Dict[str, Any]:
+    """Translates article title, takeaways, and story paragraphs concurrently and caches the result."""
+    art_id = article.get("id", 0)
+    cache_key = f"{art_id}_{lang}"
+    if cache_key in _ARTICLE_TRANSLATION_CACHE:
+        return _ARTICLE_TRANSLATION_CACHE[cache_key]
+
+    title = article.get("title", "").strip()
+    desc = (article.get("description") or "").strip()
+    source = article.get("source", "Market Wire").strip()
+    sentiment = article.get("sentiment", "NEUTRAL").upper()
+    link = article.get("link", "").strip()
+    tickers = extract_tickers(title, desc)
+
+    paras = get_story_paragraphs(link, title, desc, source, sentiment, tickers)
+
+    event_bullet = title
+    impact_bullet = desc if len(desc) > 25 else f"Direct corporate announcement and filing via {source}. Expected to influence stock sentiment."
+    action_bullet = "Monitor price volume action at market open; check key technical support/resistance levels."
+    if sentiment == "BULLISH":
+        action_bullet = "🟢 Bullish Trigger: Positive business expansion or earnings beat may attract institutional and retail buying."
+    elif sentiment == "BEARISH":
+        action_bullet = "🔴 Bearish Risk: Regulatory scrutiny, profit decline, or sell-off risk may create near-term volatility."
+    elif sentiment == "EARNINGS":
+        action_bullet = "📊 Earnings Focus: Assess quarterly EBITDA margins, year-over-year revenue, and management guidance."
+    elif sentiment == "POLICY":
+        action_bullet = "🏛️ Policy & Macro: Interest rate, inflation, or regulatory changes affecting broad market valuations."
+
+    to_translate = [title, event_bullet, impact_bullet, action_bullet] + paras
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
+        translated = list(executor.map(lambda t: translate_single_text(t, lang), to_translate))
+
+    if lang == 'pa':
+        title_tr = to_conversational_punglish(translated[0])
+        event_tr = to_conversational_punglish(translated[1])
+        impact_tr = to_conversational_punglish(translated[2])
+        action_tr = to_conversational_punglish(translated[3])
+        paras_tr = [to_conversational_punglish(p) for p in translated[4:]]
+    else:
+        title_tr = translated[0]
+        event_tr = translated[1]
+        impact_tr = translated[2]
+        action_tr = translated[3]
+        paras_tr = translated[4:]
+
+    labels = {
+        "tldr_header": "⚡ Key Takeaways (ਮੁੱਖ ਨੁਕਤੇ)" if lang == 'pa' else "⚡ Instant Key Takeaways (TL;DR)",
+        "core_label": "Main Update (ਮੁੱਖ ਅਪਡੇਟ):" if lang == 'pa' else "Core Development:",
+        "impact_label": "Market Impact (ਵਿੱਤੀ ਪ੍ਰਭਾਵ):" if lang == 'pa' else "Market & Financial Impact:",
+        "action_label": "Actionable Insight (ਸੂਝ):" if lang == 'pa' else "Actionable Insight:",
+        "read_original": f"Read Full Coverage on {source} ↗" if lang == 'pa' else f"Read Original Full Coverage on {source} ↗",
+        "lang_toggle_text": "English (ਅੰਗਰੇਜ਼ੀ)" if lang == 'pa' else "ਪੰਜਾਬੀ + Eng"
+    }
+
+    result = {
+        "status": "success",
+        "lang": lang,
+        "title": title_tr,
+        "labels": labels,
+        "bullets": {
+            "core": event_tr,
+            "impact": impact_tr,
+            "action": action_tr
+        },
+        "paragraphs": paras_tr,
+        "speech_text": f"{title_tr}. " + " ".join(paras_tr[:3])
+    }
+
+    if len(_ARTICLE_TRANSLATION_CACHE) > 500:
+        _ARTICLE_TRANSLATION_CACHE.clear()
+    _ARTICLE_TRANSLATION_CACHE[cache_key] = result
+    return result
 
 def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], base_url: str) -> str:
     """Renders the complete dedicated story page with full SEO and WhatsApp Open Graph tags."""
@@ -493,6 +659,21 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
       border-color: var(--gain-color);
       color: var(--gain-color);
     }}
+    .btn-action-pill.btn-translate {{
+      background: rgba(14, 165, 233, 0.12);
+      border-color: rgba(14, 165, 233, 0.35);
+      color: #38bdf8;
+    }}
+    .btn-action-pill.btn-translate:hover {{
+      background: rgba(14, 165, 233, 0.25);
+      color: #ffffff;
+      border-color: #38bdf8;
+    }}
+    .btn-action-pill.btn-translate.active {{
+      background: #0284c7;
+      border-color: #38bdf8;
+      color: #ffffff;
+    }}
     .tldr-card-box {{
       background: rgba(16, 23, 38, 0.65);
       border: 1px solid rgba(56, 189, 248, 0.28);
@@ -730,6 +911,19 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
       border-color: rgba(37, 211, 102, 0.4) !important;
       color: #15803d !important;
     }}
+    [data-theme="light"] .btn-action-pill.btn-translate {{
+      background: rgba(2, 132, 199, 0.08) !important;
+      border-color: rgba(2, 132, 199, 0.3) !important;
+      color: #0284c7 !important;
+    }}
+    [data-theme="light"] .btn-action-pill.btn-translate:hover {{
+      background: #0284c7 !important;
+      color: #ffffff !important;
+    }}
+    [data-theme="light"] .btn-action-pill.btn-translate.active {{
+      background: #0284c7 !important;
+      color: #ffffff !important;
+    }}
     [data-theme="light"] .tldr-card-box {{
       background: #f0fdf4 !important;
       border: 1px solid #86efac !important;
@@ -839,13 +1033,18 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
       {f'<div class="article-tickers-row">{ticker_badges}</div>' if ticker_badges else ''}
 
       <!-- Headline -->
-      <h1 class="article-title-h1">{html.escape(title)}</h1>
+      <h1 id="articleTitleH1" class="article-title-h1">{html.escape(title)}</h1>
 
       <!-- Action & Sharing Bar -->
       <div class="article-action-bar">
         <button id="listenAudioBtn" class="btn-action-pill btn-audio" title="Listen to story aloud">
           <span id="audioIcon">🔊</span>
           <span id="audioText">Listen to Story</span>
+        </button>
+
+        <button id="translateLangBtn" class="btn-action-pill btn-translate" title="Read in Conversational Punjabi + English / ਪੰਜਾਬੀ + Eng ਵਿੱਚ ਪੜ੍ਹੋ">
+          <span id="transIcon">🌐</span>
+          <span id="transText">ਪੰਜਾਬੀ + Eng</span>
         </button>
 
         <a href="{whatsapp_share_url}" target="_blank" rel="noopener noreferrer" class="btn-action-pill btn-whatsapp" title="Share on WhatsApp">
@@ -878,23 +1077,23 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
 
       <!-- TL;DR Key Takeaways -->
       <div class="tldr-card-box">
-        <div class="tldr-box-header">⚡ Instant Key Takeaways (TL;DR)</div>
+        <div id="tldrHeader" class="tldr-box-header">⚡ Instant Key Takeaways (TL;DR)</div>
         <div class="tldr-item">
           <span class="tldr-icon">🎯</span>
-          <div><strong>Core Development:</strong> {html.escape(event_bullet)}</div>
+          <div id="tldrCoreText"><strong>Core Development:</strong> {html.escape(event_bullet)}</div>
         </div>
         <div class="tldr-item">
           <span class="tldr-icon">📊</span>
-          <div><strong>Market & Financial Impact:</strong> {html.escape(impact_bullet)}</div>
+          <div id="tldrImpactText"><strong>Market & Financial Impact:</strong> {html.escape(impact_bullet)}</div>
         </div>
         <div class="tldr-item">
           <span class="tldr-icon">💡</span>
-          <div><strong>Actionable Insight:</strong> {html.escape(action_bullet)}</div>
+          <div id="tldrActionText"><strong>Actionable Insight:</strong> {html.escape(action_bullet)}</div>
         </div>
       </div>
 
       <!-- Story Narrative Body -->
-      <div class="article-body-text">
+      <div id="articleBodyText" class="article-body-text">
         {story_paragraphs_html}
       </div>
 
@@ -968,6 +1167,29 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
     const audioIcon = document.getElementById('audioIcon');
     const audioText = document.getElementById('audioText');
     let isPlaying = false;
+    let currentSpeechText = {json.dumps(story_speech_text)};
+    let currentSpeechLang = 'en-IN';
+
+    function getBestVoiceForSpeech(langCode) {{
+      if (!('speechSynthesis' in window)) return null;
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) return null;
+
+      if (langCode === 'pa') {{
+        // 1. Check for Punjabi voice
+        let v = voices.find(function(item) {{
+          return item.lang && (item.lang.startsWith('pa') || (item.name && item.name.toLowerCase().includes('punjabi')));
+        }});
+        if (v) return v;
+
+        // 2. Check for Indian Hindi/English voice that speaks Punglish with natural cadence
+        v = voices.find(function(item) {{
+          return item.lang && (item.lang === 'hi-IN' || item.lang.startsWith('hi') || item.lang === 'en-IN');
+        }});
+        if (v) return v;
+      }}
+      return voices.find(function(item) {{ return item.lang && item.lang.startsWith('en'); }}) || voices[0];
+    }}
 
     if (listenBtn && ('speechSynthesis' in window)) {{
       listenBtn.addEventListener('click', function() {{
@@ -976,15 +1198,20 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
           isPlaying = false;
           listenBtn.classList.remove('playing');
           audioIcon.textContent = '🔊';
-          audioText.textContent = 'Listen to Story';
+          audioText.textContent = (currentLang === 'pa') ? 'ਸੁਣੋ (Listen)' : 'Listen to Story';
           return;
         }}
 
         window.speechSynthesis.cancel();
-        const textToSpeak = {json.dumps(story_speech_text)};
-        const utterance = new SpeechSynthesisUtterance(textToSpeak);
-        utterance.rate = 1.0;
+        const utterance = new SpeechSynthesisUtterance(currentSpeechText);
+        utterance.rate = 0.94;
         utterance.pitch = 1.0;
+        utterance.lang = currentSpeechLang;
+
+        const bestVoice = getBestVoiceForSpeech(currentLang);
+        if (bestVoice) {{
+          utterance.voice = bestVoice;
+        }}
 
         utterance.onstart = function() {{
           isPlaying = true;
@@ -997,17 +1224,140 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
           isPlaying = false;
           listenBtn.classList.remove('playing');
           audioIcon.textContent = '🔊';
-          audioText.textContent = 'Listen to Story';
+          audioText.textContent = (currentLang === 'pa') ? 'ਸੁਣੋ (Listen)' : 'Listen to Story';
         }};
 
         utterance.onerror = function() {{
           isPlaying = false;
           listenBtn.classList.remove('playing');
           audioIcon.textContent = '🔊';
-          audioText.textContent = 'Listen to Story';
+          audioText.textContent = (currentLang === 'pa') ? 'ਸੁਣੋ (Listen)' : 'Listen to Story';
         }};
 
         window.speechSynthesis.speak(utterance);
+      }});
+    }}
+
+    // Punjabi / Bilingual Translation Logic
+    const articleId = {json.dumps(art_id)};
+    const transBtn = document.getElementById('translateLangBtn');
+    const transIcon = document.getElementById('transIcon');
+    const transText = document.getElementById('transText');
+    let currentLang = 'en';
+    let cachedTranslation = null;
+    let isTranslating = false;
+
+    const enData = {{
+      title: {json.dumps(title)},
+      tldrHeader: '⚡ Instant Key Takeaways (TL;DR)',
+      coreHtml: '<strong>Core Development:</strong> ' + {json.dumps(html.escape(event_bullet))},
+      impactHtml: '<strong>Market & Financial Impact:</strong> ' + {json.dumps(html.escape(impact_bullet))},
+      actionHtml: '<strong>Actionable Insight:</strong> ' + {json.dumps(html.escape(action_bullet))},
+      bodyHtml: {json.dumps(story_paragraphs_html)},
+      speechText: {json.dumps(story_speech_text)}
+    }};
+
+    function escapeHtml(str) {{
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }}
+
+    function applyTranslation(data) {{
+      const titleEl = document.getElementById('articleTitleH1');
+      const headerEl = document.getElementById('tldrHeader');
+      const coreEl = document.getElementById('tldrCoreText');
+      const impactEl = document.getElementById('tldrImpactText');
+      const actionEl = document.getElementById('tldrActionText');
+      const bodyEl = document.getElementById('articleBodyText');
+
+      if (titleEl) titleEl.textContent = data.title;
+      if (headerEl) headerEl.textContent = data.labels.tldr_header;
+      if (coreEl) coreEl.innerHTML = '<strong>' + data.labels.core_label + '</strong> ' + escapeHtml(data.bullets.core);
+      if (impactEl) impactEl.innerHTML = '<strong>' + data.labels.impact_label + '</strong> ' + escapeHtml(data.bullets.impact);
+      if (actionEl) actionEl.innerHTML = '<strong>' + data.labels.action_label + '</strong> ' + escapeHtml(data.bullets.action);
+
+      if (bodyEl && data.paragraphs) {{
+        bodyEl.innerHTML = data.paragraphs.map(function(p) {{
+          return '<p class="story-p">' + escapeHtml(p) + '</p>';
+        }}).join('\\n');
+      }}
+
+      if (data.speech_text) {{
+        currentSpeechText = data.speech_text;
+        currentSpeechLang = 'pa-IN';
+      }}
+
+      currentLang = 'pa';
+      if (transBtn) {{
+        transBtn.classList.add('active');
+        transIcon.textContent = '🇬🇧';
+        transText.textContent = 'English (ਅੰਗਰੇਜ਼ੀ)';
+        transBtn.title = 'ਅੰਗਰੇਜ਼ੀ ਵਿੱਚ ਪੜ੍ਹੋ / Switch to English';
+      }}
+      if (!isPlaying) {{
+        audioText.textContent = 'ਸੁਣੋ (Listen)';
+      }}
+    }}
+
+    if (transBtn) {{
+      transBtn.addEventListener('click', async function() {{
+        if (isTranslating) return;
+
+        if (currentLang === 'pa') {{
+          // Switch back to English
+          const titleEl = document.getElementById('articleTitleH1');
+          const headerEl = document.getElementById('tldrHeader');
+          const coreEl = document.getElementById('tldrCoreText');
+          const impactEl = document.getElementById('tldrImpactText');
+          const actionEl = document.getElementById('tldrActionText');
+          const bodyEl = document.getElementById('articleBodyText');
+
+          if (titleEl) titleEl.textContent = enData.title;
+          if (headerEl) headerEl.textContent = enData.tldrHeader;
+          if (coreEl) coreEl.innerHTML = enData.coreHtml;
+          if (impactEl) impactEl.innerHTML = enData.impactHtml;
+          if (actionEl) actionEl.innerHTML = enData.actionHtml;
+          if (bodyEl) bodyEl.innerHTML = enData.bodyHtml;
+
+          currentSpeechText = enData.speechText;
+          currentSpeechLang = 'en-IN';
+          currentLang = 'en';
+
+          transBtn.classList.remove('active');
+          transIcon.textContent = '🌐';
+          transText.textContent = 'ਪੰਜਾਬੀ + Eng';
+          transBtn.title = 'Read in Conversational Punjabi + English / ਪੰਜਾਬੀ + Eng ਵਿੱਚ ਪੜ੍ਹੋ';
+          if (!isPlaying) {{
+            audioText.textContent = 'Listen to Story';
+          }}
+          return;
+        }}
+
+        // Switch to Punjabi
+        if (cachedTranslation) {{
+          applyTranslation(cachedTranslation);
+          return;
+        }}
+
+        isTranslating = true;
+        transBtn.disabled = true;
+        transIcon.textContent = '⏳';
+        transText.textContent = 'ਅਨੁਵਾਦ ਹੋ ਰਿਹਾ ਹੈ...';
+
+        try {{
+          const res = await fetch('/api/article/' + articleId + '/translate?lang=pa');
+          if (!res.ok) throw new Error('Translation failed');
+          const data = await res.json();
+          cachedTranslation = data;
+          applyTranslation(data);
+        }} catch(err) {{
+          alert('ਅਨੁਵਾਦ ਲੋਡ ਕਰਨ ਵਿੱਚ ਅਸਮਰੱਥ (Translation could not be loaded). Please try again.');
+          transIcon.textContent = '🌐';
+          transText.textContent = 'ਪੰਜਾਬੀ + Eng';
+        }} finally {{
+          isTranslating = false;
+          transBtn.disabled = false;
+        }}
       }});
     }}
 
