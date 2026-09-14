@@ -90,7 +90,7 @@ async def background_news_fetch_loop():
 
 async def keep_alive_ping_loop():
     """Pings the public /api/health endpoint every 8 minutes to prevent Render free-tier idle sleep."""
-    live_url = os.environ.get("RENDER_EXTERNAL_URL", "https://zerolivenews.onrender.com").rstrip("/")
+    live_url = os.environ.get("RENDER_EXTERNAL_URL", "https://www.zerolive.in").rstrip("/")
     logger.info(f"Keep-alive self-ping worker active for: {live_url}/api/health")
     # Wait 2 minutes after boot before first ping
     await asyncio.sleep(120)
@@ -181,7 +181,7 @@ async def serve_article_page(article_id: int, slug: Optional[str] = None):
     Serves full on-site clean reader with source attribution, WhatsApp Open Graph cards, and JSON-LD schema.
     """
     article = await asyncio.to_thread(get_article_by_id, article_id)
-    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://zerolivenews.onrender.com").rstrip("/")
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://www.zerolive.in").rstrip("/")
 
     if not article:
         not_found_html = render_not_found_html(base_url)
@@ -210,12 +210,12 @@ async def serve_robots():
     if os.path.exists(robots_file):
         with open(robots_file, "r", encoding="utf-8") as f:
             return PlainTextResponse(f.read(), media_type="text/plain")
-    return PlainTextResponse("User-agent: *\nAllow: /\nSitemap: https://zerolivenews.onrender.com/sitemap.xml\n", media_type="text/plain")
+    return PlainTextResponse("User-agent: *\nAllow: /\nSitemap: https://www.zerolive.in/sitemap.xml\n", media_type="text/plain")
 
 @app.get("/sitemap.xml")
 async def serve_sitemap():
     """Generates and returns live dynamic sitemap XML with latest articles."""
-    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://zerolivenews.onrender.com").rstrip("/")
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://www.zerolive.in").rstrip("/")
     articles = await asyncio.to_thread(get_articles, None, None, None, None, 100, 0)
 
     xml_entries = [
