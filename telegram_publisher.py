@@ -31,6 +31,84 @@ COMMON_TICKERS = [
     "NIFTY", "SENSEX", "BANKNIFTY", "RBI", "FED", "SEBI"
 ]
 
+# Comprehensive Pattern for Financial Results / Earnings
+EARNINGS_RESULTS_PATTERN = re.compile(
+    r'\b('
+    r'financial\s+results?|quarterly\s+results?|un-?audited\s+(?:financial\s+)?results?|'
+    r'audited\s+(?:financial\s+)?results?|results\s+for\s+the\s+quarter|'
+    r'outcome\s+of\s+board\s+meeting.*(?:financial\s+results|results)|'
+    r'statement\s+of\s+(?:un-?audited|audited)\s+financial\s+results?|'
+    r'standalone\s+and\s+consolidated\s+financial\s+results?|'
+    r'q[1-4]\s*(?:fy\d{2,4})?\s*(?:financial\s+)?(?:results?|earnings?|net\s*profit|profit|loss|pat|numbers?|revenue|ebitda)|'
+    r'(?:net\s*profit|net\s*loss|pat)\s*(?:surges?|jumps?|rises?|falls?|drops?|slips?|up|down|declines?|grows?|soars?|dips?)|'
+    r'(?:reports?|posts?|clocks?|records?)\s*(?:net\s*profit|net\s*loss|q[1-4]|earnings?)|'
+    r'quarterly\s+(?:net\s*)?(?:profit|loss|earnings?)|'
+    r'earnings\s+(?:season|preview|review|report|release|beat|miss|call)|'
+    r'(?:q[1-4]|quarterly)\s+performance|'
+    r'dividend\s+(?:declaration|declared|recommendation)|interim\s+dividend|final\s+dividend'
+    r')\b',
+    re.IGNORECASE
+)
+
+# Routine Corporate Filings Exclusions (to filter out compliance spam from Telegram)
+ROUTINE_FILING_EXCLUSIONS = re.compile(
+    r'\b('
+    r'analysts?[/\s]*institutional\s+investor\s+meet|'
+    r'newspaper\s+publication|copy\s+of\s+newspaper|'
+    r'shareholders?\s+meeting|postal\s+ballot|'
+    r'loss\s+of\s+share\s+certificates?|duplicate\s+share\s+certificate|'
+    r'trading\s+window|closure\s+of\s+trading\s+window|'
+    r'clarification\s+on\s+price|regulation\s+30|'
+    r'prior\s+intimation\s+of\s+board\s+meeting|'
+    r'board\s+meeting\s+intimation(?!.*results)|'
+    r'intimation\s+of\s+schedule|'
+    r'updates\s+-\s+|'
+    r'structural\s+digital\s+database'
+    r')\b',
+    re.IGNORECASE
+)
+
+def is_earnings_news(title: str, description: str = "") -> bool:
+    """Checks if a story is a financial results or quarterly earnings report."""
+    text = f"{title} {description}".strip()
+    return bool(EARNINGS_RESULTS_PATTERN.search(text))
+
+def is_routine_filing(title: str) -> bool:
+    """Checks if a corporate filing is routine non-result paperwork."""
+    return bool(ROUTINE_FILING_EXCLUSIONS.search(title))
+
+def should_publish_to_telegram(story: Dict[str, Any]) -> bool:
+    """
+    OPTION 2 FILTER + EVERY EARNINGS NEWS:
+    1. Important News (crashes, surges, RBI/Fed policies, IPOs, macro).
+    2. Every Earnings News (quarterly results, Q1-Q4 net profit/loss, revenue, dividend announcements).
+    3. From NSE/BSE: STRICTLY Financial Results / Earnings ONLY (routine filings excluded).
+    """
+    title = (story.get("title") or "").strip()
+    desc = (story.get("description") or "").strip()
+    src = (story.get("source") or "").lower()
+    feed = (story.get("feed_name") or "").lower()
+    link = (story.get("link") or "").lower()
+    art_type = (story.get("type") or "general").lower()
+
+    is_exchange = ("nse" in src or "bse" in src or "exchange" in src or "bseindia" in link or "nseindia" in link)
+    is_routine = is_routine_filing(title)
+    is_earn = is_earnings_news(title, desc)
+
+    # 1. Exchange filings: strictly ONLY Financial Results / Earnings allowed
+    if is_exchange:
+        return is_earn and not is_routine
+
+    # 2. Media news: Allow if it's an Earnings / Results story
+    if is_earn and not is_routine:
+        return True
+
+    # 3. Media news: Allow if classified as 'important'
+    if art_type == "important" and not is_routine:
+        return True
+
+    return False
+
 # Default built-in credentials for ZeroLive Telegram Channel
 DEFAULT_BOT_TOKEN = "8846942797:AAHsRl9jPAYoRaVGhTt5RG6EODVqunJW-NE"
 DEFAULT_CHANNEL_ID = "@Zerolive_news"
@@ -245,8 +323,25 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
     sentiment = (story.get("sentiment") or "NEUTRAL").upper()
     art_type = (story.get("type") or "general").lower()
     source_lower = (story.get("source") or "").lower()
+    is_earn = is_earnings_news(story.get("title", ""), story.get("description", ""))
 
-    if sentiment == "BULLISH":
+    if is_earn:
+        if sentiment == "BULLISH":
+            badge_bg = (11, 61, 32)      # #0b3d20
+            badge_border = (34, 197, 94)  # #22c55e
+            badge_text = "Q-RESULTS ↑"
+            dot_color = (34, 197, 94)
+        elif sentiment == "BEARISH":
+            badge_bg = (69, 18, 21)      # #451215
+            badge_border = (239, 68, 68)  # #ef4444
+            badge_text = "Q-RESULTS ↓"
+            dot_color = (239, 68, 68)
+        else:
+            badge_bg = (14, 42, 71)      # deep corporate blue
+            badge_border = (56, 189, 248) # #38bdf8 cyan
+            badge_text = "Q-RESULTS"
+            dot_color = (56, 189, 248)
+    elif sentiment == "BULLISH":
         badge_bg = (11, 61, 32)      # #0b3d20
         badge_border = (34, 197, 94)  # #22c55e
         badge_text = "BULLISH ↑"
@@ -300,7 +395,11 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
     # 5. Main Content Area
     # 5a. Wire Category Header with Ticker Tag
     ticker = extract_ticker(story.get("title", ""), story.get("description", ""))
-    tag_text = f"⚡ BREAKING MARKET WIRE  •  #{ticker}" if ticker else "⚡ BREAKING MARKET WIRE"
+    if is_earn:
+        wire_tag = "📊 FINANCIAL RESULTS WIRE"
+    else:
+        wire_tag = "⚡ BREAKING MARKET WIRE"
+    tag_text = f"{wire_tag}  •  #{ticker}" if ticker else wire_tag
     font_tag = get_font(19, bold=True)
     draw.text((50, 120), tag_text, font=font_tag, fill=(245, 158, 11))
 
@@ -388,8 +487,16 @@ def build_telegram_caption(story: Dict[str, Any], base_url: str = "https://www.z
     ticker_tags = f"#{ticker}" if ticker else ""
     art_type = (story.get("type") or "general").lower()
     source_lower = (story.get("source") or "").lower()
+    is_earn = is_earnings_news(raw_title, story.get("description", ""))
 
-    if sentiment == "BULLISH":
+    if is_earn:
+        if sentiment == "BULLISH":
+            badge_header = f"📊 <b>FINANCIAL RESULTS (BULLISH ↑)</b> | <b>{source}</b>"
+        elif sentiment == "BEARISH":
+            badge_header = f"📊 <b>FINANCIAL RESULTS (BEARISH ↓)</b> | <b>{source}</b>"
+        else:
+            badge_header = f"📊 <b>FINANCIAL RESULTS</b> | <b>{source}</b>"
+    elif sentiment == "BULLISH":
         badge_header = f"🟢 <b>BULLISH</b> | <b>{source}</b>"
     elif sentiment == "BEARISH":
         badge_header = f"🔴 <b>BEARISH</b> | <b>{source}</b>"
@@ -531,14 +638,19 @@ def process_and_publish_new_stories(limit: int = 15) -> int:
         logger.error(f"Error querying articles for Telegram publish: {e}")
         return 0
 
-    # Filter to articles not yet sent
+    # Filter to articles not yet sent that meet Option 2 criteria (Important + Financial Results)
     pending = []
     for art in recent_articles:
         rec_id = str(art.get("id") or art.get("link"))
         if rec_id and rec_id not in sent_records:
-            pending.append(art)
+            if should_publish_to_telegram(art):
+                pending.append(art)
+            else:
+                # Mark routine filings and unimpactful news as handled so we don't re-check repeatedly
+                sent_records.add(rec_id)
 
     if not pending:
+        save_sent_records(sent_records)
         return 0
 
     # Publish oldest pending first so chronology is preserved

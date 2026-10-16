@@ -186,16 +186,51 @@ PERCENTAGE_DIRECTION_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-# Strict Whitelist Pattern for NSE / BSE Corporate Filings: ONLY Genuine Financial Results
-FILING_RESULTS_PATTERN = re.compile(
-    r'\b(financial results?|quarterly results?|un-?audited (?:financial )?results?|audited (?:financial )?results?|results for the quarter)\b',
+# Comprehensive Pattern for Financial Results / Earnings (Quarterly, Annual, PAT, Revenue, Dividend)
+EARNINGS_RESULTS_PATTERN = re.compile(
+    r'\b('
+    r'financial\s+results?|quarterly\s+results?|un-?audited\s+(?:financial\s+)?results?|'
+    r'audited\s+(?:financial\s+)?results?|results\s+for\s+the\s+quarter|'
+    r'outcome\s+of\s+board\s+meeting.*(?:financial\s+results|results)|'
+    r'statement\s+of\s+(?:un-?audited|audited)\s+financial\s+results?|'
+    r'standalone\s+and\s+consolidated\s+financial\s+results?|'
+    r'q[1-4]\s*(?:fy\d{2,4})?\s*(?:financial\s+)?(?:results?|earnings?|net\s*profit|profit|loss|pat|numbers?|revenue|ebitda)|'
+    r'(?:net\s*profit|net\s*loss|pat)\s*(?:surges?|jumps?|rises?|falls?|drops?|slips?|up|down|declines?|grows?|soars?|dips?)|'
+    r'(?:reports?|posts?|clocks?|records?)\s*(?:net\s*profit|net\s*loss|q[1-4]|earnings?)|'
+    r'quarterly\s+(?:net\s*)?(?:profit|loss|earnings?)|'
+    r'earnings\s+(?:season|preview|review|report|release|beat|miss|call)|'
+    r'(?:q[1-4]|quarterly)\s+performance|'
+    r'dividend\s+(?:declaration|declared|recommendation)|interim\s+dividend|final\s+dividend'
+    r')\b',
     re.IGNORECASE
 )
 
-FILING_ROUTINE_EXCLUSIONS = re.compile(
-    r'\b(board meeting intimation|prior intimation|intimation of board meeting|newspaper publication|copy of newspaper|clarification\s*[-–]\s*financial results|clarification on price)\b',
+# Routine Corporate Filings Exclusions (to filter out compliance spam from Important & Telegram)
+ROUTINE_FILING_EXCLUSIONS = re.compile(
+    r'\b('
+    r'analysts?[/\s]*institutional\s+investor\s+meet|'
+    r'newspaper\s+publication|copy\s+of\s+newspaper|'
+    r'shareholders?\s+meeting|postal\s+ballot|'
+    r'loss\s+of\s+share\s+certificates?|duplicate\s+share\s+certificate|'
+    r'trading\s+window|closure\s+of\s+trading\s+window|'
+    r'clarification\s+on\s+price|regulation\s+30|'
+    r'prior\s+intimation\s+of\s+board\s+meeting|'
+    r'board\s+meeting\s+intimation(?!.*results)|'
+    r'intimation\s+of\s+schedule|'
+    r'updates\s+-\s+|'
+    r'structural\s+digital\s+database'
+    r')\b',
     re.IGNORECASE
 )
+
+def is_earnings_news(title: str, description: str = "") -> bool:
+    """Checks if a story is a financial results or quarterly earnings report."""
+    text = f"{title} {description}".strip()
+    return bool(EARNINGS_RESULTS_PATTERN.search(text))
+
+def is_routine_filing(title: str) -> bool:
+    """Checks if a corporate filing is routine non-result paperwork."""
+    return bool(ROUTINE_FILING_EXCLUSIONS.search(title))
 
 def is_exchange_filing_source(source_name: str, feed_name: str = "", link: str = "") -> bool:
     """Identifies whether an article originates from an official exchange filing stream."""
@@ -213,9 +248,9 @@ def is_exchange_filing_source(source_name: str, feed_name: str = "", link: str =
 def is_important_filing(title: str) -> bool:
     """Strict check: ONLY genuine Financial Results are marked as Important from BSE/NSE."""
     t = title.strip()
-    if FILING_ROUTINE_EXCLUSIONS.search(t):
+    if is_routine_filing(t):
         return False
-    if FILING_RESULTS_PATTERN.search(t):
+    if is_earnings_news(t):
         return True
     return False
 
@@ -255,14 +290,15 @@ def classify_article(article: Dict[str, Any], batch_articles: Optional[List[Dict
     """
     Classifies an article into exactly one type:
       - PATH 1: For NSE/BSE Corporate Filings:
-          ONLY genuine Financial Results -> 'important'
-          ALL other corporate filings -> 'filing'
+          ONLY genuine Financial Results / Earnings -> 'important'
+          ALL routine corporate filings -> 'filing'
       - PATH 2: For Genuine News Outlets (ET, BS, Mint, MC, Reuters, CNBC, Yahoo, Investing, FT, Trump Wire):
-          STEP A: 'important' (keywords, % volatility, cross-source breaking)
+          STEP A: 'important' (Earnings news, key macro/market-moving keywords, % volatility, cross-source breaking)
           STEP B: 'filing'
           STEP C: 'general'
     """
     title = (article.get("title") or "").strip()
+    desc = (article.get("description") or "").strip()
     src = (article.get("source") or "").strip()
     feed = (article.get("feed_name") or "").strip()
     link = (article.get("link") or "").strip()
@@ -277,6 +313,11 @@ def classify_article(article: Dict[str, Any], batch_articles: Optional[List[Dict
     title_lower = title.lower()
 
     # STEP A: Check "Important" for news media
+    # 1. Every Earnings / Financial Results news is always Important
+    if is_earnings_news(title, desc) and not is_routine_filing(title):
+        return "important"
+
+    # 2. Key market-moving events (crash, plunge, surge, RBI, Fed, war, IPO, etc.)
     for kw in IMPORTANT_KEYWORDS:
         if re.search(r"\b" + re.escape(kw) + r"\b", title_lower):
             return "important"
