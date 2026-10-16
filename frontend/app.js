@@ -32,7 +32,8 @@
     calendarSearch: '',
     speechPlayingId: null,
     speechUtterance: null,
-    activeModalArticle: null
+    activeModalArticle: null,
+    connectionFailureCount: 0
   };
 
   // DOM Element References
@@ -1020,10 +1021,13 @@
   }
 
   function getApiBaseUrl() {
-    // If running directly from file:/// or headless origin, point to local server port 8000
-    if (window.location.protocol === 'file:' || window.location.origin === 'null' || !window.location.host) {
-      return 'http://localhost:8000';
+    // Live production API uses relative path by default
+    // Only attempt http://localhost:8000 if developing locally on localhost or 127.0.0.1
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return window.location.port === '8000' ? '' : 'http://localhost:8000';
     }
+    // Public visitors never try to ping localhost
     return '';
   }
 
@@ -1084,9 +1088,11 @@
       state.articles = newsData.articles || [];
       state.stats = statsData ? statsData.stats : null;
       state.lastFetchedAt = new Date();
+      state.connectionFailureCount = 0;
 
       if (dom.connectionBanner) {
         dom.connectionBanner.classList.add('hidden');
+        dom.connectionBanner.innerHTML = '';
       }
 
       updateStatsDisplay();
@@ -1104,16 +1110,29 @@
       updateCountdownDisplay();
 
     } catch (err) {
-      console.warn('News sync connection issue:', err);
-      if (dom.connectionBanner) {
+      state.connectionFailureCount = (state.connectionFailureCount || 0) + 1;
+      console.warn(`News sync connection issue (attempt ${state.connectionFailureCount}):`, err);
+
+      // Render clean user banner ONLY after 2 failed retries
+      if (state.connectionFailureCount >= 2 && dom.connectionBanner) {
+        dom.connectionBanner.innerHTML = `
+          <div class="banner-content">
+            <span class="banner-icon">⚡</span>
+            <div class="banner-text">
+              <strong>⚡ Live feed syncing...</strong> Reconnecting to market server.
+            </div>
+          </div>
+          <button class="banner-retry-btn" id="bannerRetryBtn">Retry</button>
+        `;
         dom.connectionBanner.classList.remove('hidden');
       }
+
       if (!state.articles || state.articles.length === 0) {
         dom.newsGrid.classList.add('hidden');
         dom.emptyState.classList.add('hidden');
       }
       if (showSpinner) {
-        showToast('Cannot connect to news server. Ensure server is running on port 8000.', '⚠️');
+        showToast('⚡ Live feed syncing... Reconnecting to market server.', '⚡');
       }
     } finally {
       dom.refreshBtn.classList.remove('spinning');
@@ -1598,8 +1617,13 @@
     };
 
     if (dom.resetFiltersBtn) dom.resetFiltersBtn.addEventListener('click', resetAll);
-    if (dom.emptyResetBtn) dom.emptyResetBtn.addEventListener('click', resetAll);
-    if (dom.bannerRetryBtn) dom.bannerRetryBtn.addEventListener('click', () => fetchNews(true));
+    if (dom.connectionBanner) {
+      dom.connectionBanner.addEventListener('click', (e) => {
+        if (e.target && (e.target.id === 'bannerRetryBtn' || e.target.classList.contains('banner-retry-btn'))) {
+          fetchNews(true);
+        }
+      });
+    }
     if (dom.themeToggleBtn) dom.themeToggleBtn.addEventListener('click', toggleTheme);
     if (dom.pushToggleBtn) dom.pushToggleBtn.addEventListener('click', togglePushNotifications);
 

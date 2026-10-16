@@ -167,16 +167,8 @@
 
     <!-- Main Content Stream Area -->
     <main class="main-content">
-      <!-- Connection Alert Banner (Shown if local server is unreachable or opened via file://) -->
-      <div class="connection-banner hidden" id="connectionBanner">
-        <div class="banner-content">
-          <span class="banner-icon">⚠️</span>
-          <div class="banner-text">
-            <strong>Server Not Connected:</strong> Could not reach the news backend. Make sure the server is started with <code>python app.py</code> or double-click <code>start.bat</code>, then open <a href="http://localhost:8000" id="bannerLocalhostLink">http://localhost:8000</a>.
-          </div>
-        </div>
-        <button class="banner-retry-btn" id="bannerRetryBtn">Retry Connection</button>
-      </div>
+      <!-- Live Sync / Connection Alert Banner (Rendered dynamically via JS only after failed retries) -->
+      <div class="connection-banner hidden" id="connectionBanner" role="status" aria-live="polite"></div>
 
       <!-- Filter & Search Toolbar -->
       <section class="control-panel">
