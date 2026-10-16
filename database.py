@@ -79,6 +79,13 @@ def init_db():
                     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE INDEX IF NOT EXISTS idx_key_events_date ON key_events (event_date ASC);
+
+                CREATE TABLE IF NOT EXISTS telegram_sent_log (
+                    story_id TEXT PRIMARY KEY,
+                    title_hash TEXT,
+                    sent_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_telegram_sent_title ON telegram_sent_log (title_hash);
             """)
             try:
                 cur.execute("ALTER TABLE articles ADD COLUMN IF NOT EXISTS type TEXT DEFAULT 'general';")
@@ -133,6 +140,13 @@ def init_db():
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
                 );
                 CREATE INDEX IF NOT EXISTS idx_key_events_date ON key_events (event_date ASC);
+
+                CREATE TABLE IF NOT EXISTS telegram_sent_log (
+                    story_id TEXT PRIMARY KEY,
+                    title_hash TEXT,
+                    sent_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_telegram_sent_title ON telegram_sent_log (title_hash);
             """)
             try:
                 cur.execute("ALTER TABLE articles ADD COLUMN type TEXT DEFAULT 'general';")
@@ -815,5 +829,90 @@ def delete_key_event(event_id: int) -> bool:
         return False
     finally:
         conn.close()
+
+
+# ==============================================================================
+# Telegram Sent Log Helpers (Cross-Restart Persistent Deduplication)
+# ==============================================================================
+
+def normalize_title_hash(title: str) -> str:
+    """Creates a normalized hash string of a title to prevent duplicate cross-feed Telegram alerts."""
+    import re
+    cleaned = re.sub(r'[^a-z0-9]', '', (title or "").lower())
+    return cleaned[:70]
+
+def is_story_sent_to_telegram(story_id: str, title: str = "") -> bool:
+    """Checks if a story has already been broadcasted to Telegram (by ID or Title hash)."""
+    init_db()
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        thash = normalize_title_hash(title) if title else ""
+        if thash:
+            if is_postgres():
+                cur.execute("SELECT 1 FROM telegram_sent_log WHERE story_id = %s OR title_hash = %s LIMIT 1", (str(story_id), thash))
+            else:
+                cur.execute("SELECT 1 FROM telegram_sent_log WHERE story_id = ? OR title_hash = ? LIMIT 1", (str(story_id), thash))
+        else:
+            if is_postgres():
+                cur.execute("SELECT 1 FROM telegram_sent_log WHERE story_id = %s LIMIT 1", (str(story_id),))
+            else:
+                cur.execute("SELECT 1 FROM telegram_sent_log WHERE story_id = ? LIMIT 1", (str(story_id),))
+        row = cur.fetchone()
+        return bool(row)
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+def mark_story_sent_to_telegram(story_id: str, title: str = ""):
+    """Marks a story as sent to Telegram permanently in the database."""
+    init_db()
+    conn = get_db_connection()
+    try:
+        cur = conn.cursor()
+        thash = normalize_title_hash(title) if title else ""
+        if is_postgres():
+            cur.execute("""
+                INSERT INTO telegram_sent_log (story_id, title_hash)
+                VALUES (%s, %s)
+                ON CONFLICT (story_id) DO UPDATE SET title_hash = EXCLUDED.title_hash;
+            """, (str(story_id), thash))
+        else:
+            cur.execute("""
+                INSERT OR REPLACE INTO telegram_sent_log (story_id, title_hash)
+                VALUES (?, ?);
+            """, (str(story_id), thash))
+        conn.commit()
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+def load_sent_telegram_records_from_db() -> Tuple[set, set]:
+    """Loads all sent story IDs and title hashes from the persistent database table."""
+    init_db()
+    conn = get_db_connection()
+    ids = set()
+    titles = set()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT story_id, title_hash FROM telegram_sent_log")
+        rows = cur.fetchall()
+        for r in rows:
+            if isinstance(r, (tuple, list)):
+                s_id, t_hash = r[0], r[1]
+            else:
+                s_id, t_hash = r["story_id"], r["title_hash"]
+            if s_id:
+                ids.add(str(s_id))
+            if t_hash:
+                titles.add(str(t_hash))
+    except Exception:
+        pass
+    finally:
+        conn.close()
+    return ids, titles
+
 
 

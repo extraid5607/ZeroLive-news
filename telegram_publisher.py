@@ -4,7 +4,8 @@ import time
 import json
 import html
 import logging
-from typing import Dict, Any, List, Optional, Tuple
+import threading
+from typing import Dict, Any, List, Optional, Tuple, Set
 from PIL import Image, ImageDraw, ImageFont
 import requests
 
@@ -19,6 +20,11 @@ SENT_FILE = os.path.join(BASE_DIR, "telegram_sent.json")
 # Ensure necessary directories exist
 os.makedirs(TEMP_BANNER_DIR, exist_ok=True)
 os.makedirs(FONTS_DIR, exist_ok=True)
+
+# Concurrency & Deduplication Guards
+_PUBLISH_LOCK = threading.Lock()
+_SENT_IDS: Set[str] = set()
+_SENT_TITLES: Set[str] = set()
 
 # Common Indian ticker list for smart hashtag tagging
 COMMON_TICKERS = [
@@ -596,95 +602,167 @@ def save_sent_records(records: set):
 def init_first_boot_guard():
     """
     CRITICAL FIRST-BOOT GUARD:
-    If telegram_sent.json does not exist yet (or is empty), seed it with existing
-    stories in the database, leaving the 3 newest stories to be sent immediately so the user
-    sees breaking cards in their Telegram channel without waiting.
+    Seeds persistent storage (DB + telegram_sent.json) with existing stories if empty,
+    so older backlog stories are never spammed.
     """
-    if not os.path.exists(SENT_FILE) or os.path.getsize(SENT_FILE) == 0:
+    global _SENT_IDS, _SENT_TITLES
+    from database import load_sent_telegram_records_from_db, mark_story_sent_to_telegram, normalize_title_hash
+    db_ids, db_titles = load_sent_telegram_records_from_db()
+    file_records = load_sent_records()
+
+    if not db_ids and not file_records:
         logger.info("Initializing Telegram First-Boot Guard (preventing backlog spam)...")
         try:
             from database import get_articles
             all_existing = get_articles(limit=2000)
-            records = set()
-            # Seed older stories (leave 3 freshest unsent so channel gets live cards right away)
-            to_seed = all_existing[3:] if len(all_existing) > 3 else []
+            # Seed older stories (leave newest 2 unsent so channel gets live cards right away)
+            to_seed = all_existing[2:] if len(all_existing) > 2 else []
             for art in to_seed:
                 rec_id = str(art.get("id") or art.get("link"))
+                title = art.get("title") or ""
                 if rec_id:
-                    records.add(rec_id)
-            save_sent_records(records)
-            logger.info(f"Telegram First-Boot Guard active: {len(records)} existing stories marked as sent. 3 newest primed for publishing.")
+                    _SENT_IDS.add(rec_id)
+                    mark_story_sent_to_telegram(rec_id, title)
+                t_hash = normalize_title_hash(title)
+                if t_hash:
+                    _SENT_TITLES.add(t_hash)
+            save_sent_records(_SENT_IDS)
+            logger.info(f"Telegram First-Boot Guard active: {len(_SENT_IDS)} existing stories marked as sent.")
         except Exception as e:
             logger.warning(f"Could not initialize first-boot guard from database: {e}")
+    else:
+        _SENT_IDS.update(db_ids)
+        _SENT_IDS.update(file_records)
+        _SENT_TITLES.update(db_titles)
 
 
 def process_and_publish_new_stories(limit: int = 15) -> int:
     """
     Scans for newly arriving stories not yet published to Telegram,
-    generates cards, and broadcasts them with a 3-second delay between posts.
+    generates cards, and broadcasts them with atomic locking and strict multi-layer deduplication.
     """
-    token, channel_id = get_telegram_credentials()
-    if not token or not channel_id:
-        return 0
+    global _PUBLISH_LOCK, _SENT_IDS, _SENT_TITLES
 
-    init_first_boot_guard()
-    sent_records = load_sent_records()
+    # 1. Non-blocking Lock: Strictly enforce only ONE worker publishes at any time!
+    if not _PUBLISH_LOCK.acquire(blocking=False):
+        logger.info("Telegram publisher is already actively running in another thread. Skipping concurrent execution.")
+        return 0
 
     try:
-        from database import get_articles
-        # Fetch newest articles across all feeds so every incoming story gets published
-        recent_articles = get_articles(limit=limit)
-    except Exception as e:
-        logger.error(f"Error querying articles for Telegram publish: {e}")
-        return 0
+        token, channel_id = get_telegram_credentials()
+        if not token or not channel_id:
+            return 0
 
-    # Filter to articles not yet sent that meet Option 2 criteria (Important + Financial Results)
-    pending = []
-    for art in recent_articles:
-        rec_id = str(art.get("id") or art.get("link"))
-        if rec_id and rec_id not in sent_records:
+        init_first_boot_guard()
+
+        from database import (
+            get_articles,
+            is_story_sent_to_telegram,
+            mark_story_sent_to_telegram,
+            load_sent_telegram_records_from_db,
+            normalize_title_hash
+        )
+
+        # Refresh sent cache from DB & JSON
+        db_ids, db_titles = load_sent_telegram_records_from_db()
+        file_ids = load_sent_records()
+        _SENT_IDS.update(db_ids)
+        _SENT_IDS.update(file_ids)
+        _SENT_TITLES.update(db_titles)
+
+        try:
+            recent_articles = get_articles(limit=limit)
+        except Exception as e:
+            logger.error(f"Error querying articles for Telegram publish: {e}")
+            return 0
+
+        pending = []
+        for art in recent_articles:
+            rec_id = str(art.get("id") or art.get("link"))
+            rec_link = str(art.get("link") or "").strip()
+            title = (art.get("title") or "").strip()
+            t_hash = normalize_title_hash(title)
+
+            # Strict Multi-Layer Deduplication:
+            # Check ID, URL, or Title Hash in memory cache
+            if rec_id in _SENT_IDS or (rec_link and rec_link in _SENT_IDS) or (t_hash and t_hash in _SENT_TITLES):
+                continue
+
+            # Check persistent database log
+            if is_story_sent_to_telegram(rec_id, title) or (rec_link and is_story_sent_to_telegram(rec_link, title)):
+                _SENT_IDS.add(rec_id)
+                if rec_link:
+                    _SENT_IDS.add(rec_link)
+                if t_hash:
+                    _SENT_TITLES.add(t_hash)
+                continue
+
+            # Check Option 2 Filter (Important + Financial Results)
             if should_publish_to_telegram(art):
                 pending.append(art)
+                # Immediately pre-mark in in-memory cache to prevent any race condition
+                _SENT_IDS.add(rec_id)
+                if rec_link:
+                    _SENT_IDS.add(rec_link)
+                if t_hash:
+                    _SENT_TITLES.add(t_hash)
             else:
-                # Mark routine filings and unimpactful news as handled so we don't re-check repeatedly
-                sent_records.add(rec_id)
+                # Mark routine filings and unimpactful news so we don't re-check repeatedly
+                _SENT_IDS.add(rec_id)
+                if rec_link:
+                    _SENT_IDS.add(rec_link)
+                if t_hash:
+                    _SENT_TITLES.add(t_hash)
+                mark_story_sent_to_telegram(rec_id, title)
 
-    if not pending:
-        save_sent_records(sent_records)
-        return 0
+        if not pending:
+            save_sent_records(_SENT_IDS)
+            return 0
 
-    # Publish oldest pending first so chronology is preserved
-    pending.reverse()
-    published_count = 0
+        # Publish oldest pending first so chronological order is preserved
+        pending.reverse()
+        published_count = 0
 
-    for story in pending:
-        rec_id = str(story.get("id") or story.get("link"))
-        image_path = None
-        try:
-            logger.info(f"Generating Telegram breaking card for story #{story.get('id')}: {story.get('title')[:60]}...")
-            image_path = generate_telegram_card(story)
-            caption = build_telegram_caption(story)
+        for story in pending:
+            rec_id = str(story.get("id") or story.get("link"))
+            rec_link = str(story.get("link") or "").strip()
+            title = (story.get("title") or "").strip()
+            t_hash = normalize_title_hash(title)
+            image_path = None
+            try:
+                logger.info(f"Generating Telegram breaking card for story #{story.get('id')}: {title[:60]}...")
+                image_path = generate_telegram_card(story)
+                caption = build_telegram_caption(story)
 
-            success = send_telegram_photo(image_path, caption)
-            if success:
-                sent_records.add(rec_id)
-                save_sent_records(sent_records)
-                published_count += 1
-                logger.info(f"Successfully posted breaking card to Telegram for #{story.get('id')}")
-                # 3-second rate limit between posts
-                time.sleep(3)
-            else:
-                logger.warning(f"Failed to post story #{story.get('id')} to Telegram.")
-        except Exception as err:
-            logger.error(f"Error processing story for Telegram: {err}")
-        finally:
-            if image_path and os.path.exists(image_path):
-                try:
-                    os.remove(image_path)
-                except Exception:
-                    pass
+                success = send_telegram_photo(image_path, caption)
+                if success:
+                    published_count += 1
+                    # Persist to both database AND json file
+                    mark_story_sent_to_telegram(rec_id, title)
+                    if rec_link and rec_link != rec_id:
+                        mark_story_sent_to_telegram(rec_link, title)
+                    _SENT_IDS.add(rec_id)
+                    if rec_link:
+                        _SENT_IDS.add(rec_link)
+                    if t_hash:
+                        _SENT_TITLES.add(t_hash)
+                    save_sent_records(_SENT_IDS)
+                    logger.info(f"Successfully posted breaking card to Telegram for #{story.get('id')}")
+                    time.sleep(3)
+                else:
+                    logger.warning(f"Failed to post story #{story.get('id')} to Telegram.")
+            except Exception as err:
+                logger.error(f"Error processing story for Telegram: {err}")
+            finally:
+                if image_path and os.path.exists(image_path):
+                    try:
+                        os.remove(image_path)
+                    except Exception:
+                        pass
 
-    return published_count
+        return published_count
+    finally:
+        _PUBLISH_LOCK.release()
 
 
 def test_telegram_alert() -> Dict[str, Any]:

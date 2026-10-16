@@ -81,12 +81,12 @@ if os.path.exists(FRONTEND_DIR):
 
 async def background_news_fetch_loop():
     """Continuously fetches breaking news from all RSS and exchange feeds every 2 minutes."""
-    await asyncio.sleep(1)
+    await asyncio.sleep(5)
     while True:
         try:
             logger.info("Background Auto-Fetcher: Syncing Indian & Global market feeds for breaking news...")
             await asyncio.to_thread(fetch_and_store_all_news)
-            # Ensure telegram publisher checks for any pending unsent news
+            # Ensure telegram publisher checks for any pending unsent news sequentially
             try:
                 from telegram_publisher import process_and_publish_new_stories
                 await asyncio.to_thread(process_and_publish_new_stories, 15)
@@ -127,11 +127,10 @@ async def on_startup():
     stats = get_stats()
     logger.info(f"Server started. Current database articles: {stats['total_articles']}")
 
-    # Initialize Telegram First-Boot Guard and immediately trigger initial publisher
+    # Initialize Telegram First-Boot Guard (prevents backlog spam)
     try:
-        from telegram_publisher import init_first_boot_guard, process_and_publish_new_stories
+        from telegram_publisher import init_first_boot_guard
         await asyncio.to_thread(init_first_boot_guard)
-        asyncio.create_task(asyncio.to_thread(process_and_publish_new_stories, 5))
     except Exception as tg_init_err:
         logger.warning(f"Telegram first-boot guard initialization issue: {tg_init_err}")
 
