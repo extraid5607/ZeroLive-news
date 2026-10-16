@@ -228,6 +228,18 @@ def get_font(size: int, bold: bool = False) -> ImageFont.ImageFont:
         return None
 
 
+def clean_raw_text(text: str) -> str:
+    """Removes HTML tags, decodes HTML entities (&nbsp;, &amp;, etc.), and normalizes whitespace."""
+    if not text:
+        return ""
+    clean = html.unescape(text)
+    clean = re.sub(r'<[^>]+>', ' ', clean)
+    clean = clean.replace('\xa0', ' ').replace('&nbsp;', ' ')
+    clean = re.sub(r'[\r\n\t]+', ' ', clean)
+    clean = re.sub(r'\s+', ' ', clean).strip()
+    return clean
+
+
 def extract_ticker(title: str, description: str = "") -> str:
     """Extracts high-confidence stock ticker tag from headline or description."""
     full_text = f"{title} {description}".upper()
@@ -410,9 +422,7 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
     draw.text((50, 120), tag_text, font=font_tag, fill=(245, 158, 11))
 
     # 5b. Headline with Dynamic Font Scaling (44px down to 34px, max 3 lines)
-    raw_title = (story.get("title") or "Market Breaking Update").strip()
-    clean_title = re.sub(r'[\r\n\t]+', ' ', raw_title)
-    clean_title = re.sub(r'\s+', ' ', clean_title)
+    clean_title = clean_raw_text(story.get("title") or "Market Breaking Update")
 
     font_headline = None
     headline_lines = []
@@ -437,10 +447,7 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
         curr_y += line_height
 
     # 5c. Summary (max 3 lines cleanly truncated with ..., 24px)
-    raw_desc = (story.get("description") or "").strip()
-    clean_desc = re.sub(r'<[^>]+>', '', raw_desc)
-    clean_desc = re.sub(r'[\r\n\t]+', ' ', clean_desc)
-    clean_desc = re.sub(r'\s+', ' ', clean_desc).strip()
+    clean_desc = clean_raw_text(story.get("description") or "")
 
     if clean_desc:
         curr_y += 32
@@ -453,7 +460,7 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
 
         sum_line_height = 34
         for s_line in summary_lines:
-            draw.text((50, curr_y), s_line, font=font_summary, fill=(148, 163, 184))
+            draw.text((50, curr_y), s_line, font=font_summary, fill=(226, 232, 240))
             curr_y += sum_line_height
 
     # 6. Bottom Footer Bar
@@ -461,7 +468,7 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
     draw.line([(50, 600), (width - 50, 600)], fill=(0, 240, 255), width=2)
 
     # 6a. Bottom-Left Source
-    source = (story.get("source") or story.get("feed_name") or "ZeroLive Wire").strip()
+    source = clean_raw_text(story.get("source") or story.get("feed_name") or "ZeroLive Wire")
     font_footer = get_font(19, bold=False)
     draw.text((50, 622), f"📰 Source: {source}", font=font_footer, fill=(203, 213, 225))
 
@@ -482,17 +489,21 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
 
 def build_telegram_caption(story: Dict[str, Any], base_url: str = "https://www.zerolive.in") -> str:
     """
-    Constructs an HTML-escaped Telegram photo caption strictly under 950 characters.
+    Constructs an ultra-clean, minimal, clutter-free Telegram photo caption.
+    All key story context is already rendered in the generated image card,
+    so the caption stays punchy, fast to read, and un-cluttered.
     """
-    sentiment = (story.get("sentiment") or "NEUTRAL").upper()
-    source = html.escape((story.get("source") or story.get("feed_name") or "ZeroLive Wire").strip())
-    raw_title = (story.get("title") or "Market Update").strip()
+    raw_title = clean_raw_text(story.get("title") or "Market Update")
     escaped_title = html.escape(raw_title)
 
+    raw_source = clean_raw_text(story.get("source") or story.get("feed_name") or "ZeroLive Wire")
+    source = html.escape(raw_source)
+
+    sentiment = (story.get("sentiment") or "NEUTRAL").upper()
     ticker = extract_ticker(raw_title, story.get("description", ""))
     ticker_tags = f"#{ticker}" if ticker else ""
     art_type = (story.get("type") or "general").lower()
-    source_lower = (story.get("source") or "").lower()
+    source_lower = raw_source.lower()
     is_earn = is_earnings_news(raw_title, story.get("description", ""))
 
     if is_earn:
@@ -522,23 +533,12 @@ def build_telegram_caption(story: Dict[str, Any], base_url: str = "https://www.z
     else:
         story_url = story.get("link") or base_url
 
-    footer = f'⚡ <a href="{base_url}">Live Market Terminal</a> | 🔗 <a href="{story_url}">Read Full Story</a>'
-
-    # Clean description and calculate budget for max 950 total caption chars
-    raw_desc = (story.get("description") or "").strip()
-    clean_desc = re.sub(r'<[^>]+>', '', raw_desc)
-    clean_desc = re.sub(r'[\r\n\t]+', ' ', clean_desc)
-    clean_desc = re.sub(r'\s+', ' ', clean_desc).strip()
-
-    fixed_len = len(badge_header) + 4 + len(escaped_title) + 11 + 4 + len(footer)
-    max_desc_len = max(100, 930 - fixed_len)
-
-    if len(clean_desc) > max_desc_len:
-        clean_desc = clean_desc[:max_desc_len - 3] + "..."
-
-    escaped_summary = html.escape(clean_desc)
-
-    caption = f"{badge_header}\n\n📰 <b>{escaped_title}</b>\n\n{escaped_summary}\n\n{footer}"
+    # Clean, uncluttered, professional caption
+    caption = (
+        f"{badge_header}\n\n"
+        f"📰 <b>{escaped_title}</b>\n\n"
+        f'⚡ <a href="{story_url}"><b>Read Full Story on ZeroLive Terminal ↗</b></a>'
+    )
     return caption
 
 
