@@ -118,6 +118,14 @@
             <!-- About Page Link -->
             <a href="/about" class="btn-nav-about" title="About ZeroLive, Methodology & SEBI Disclaimer">ℹ️ About</a>
 
+            <!-- Telegram Channel Link -->
+            <a href="https://t.me/Zerolive_news" target="_blank" rel="noopener noreferrer" class="btn-nav-telegram" title="Join ZeroLive Telegram Wire (@Zerolive_news)" aria-label="Join Telegram Channel">
+              <svg class="telegram-icon-svg" width="15" height="15" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+              </svg>
+              <span class="telegram-label">Telegram</span>
+            </a>
+
             <!-- Push Notification Button -->
             <button class="btn-push-toggle" id="pushToggleBtn" title="Enable Breaking Market Push Notifications" aria-label="Enable Push Notifications">
               <span class="push-icon" id="pushIcon">🔔</span>
@@ -186,6 +194,25 @@
       <h2 class="sr-only" id="mainFeedHeading">Live Indian Stock Market News Wire, NSE/BSE Corporate Filings & AI Signals</h2>
       <!-- Live Sync / Connection Alert Banner (Rendered dynamically via JS only after failed retries) -->
       <div class="connection-banner hidden" id="connectionBanner" role="status" aria-live="polite"></div>
+
+      <!-- Telegram Channel Live Wire Callout Banner -->
+      <div class="telegram-callout-banner">
+        <div class="tg-banner-left">
+          <div class="tg-icon-badge">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="#229ED9">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+            </svg>
+          </div>
+          <div class="tg-banner-text">
+            <div class="tg-banner-title">⚡ ZeroLive Breaking News & Q-Results on Telegram</div>
+            <div class="tg-banner-desc">Get dark-mode breaking cards, corporate earnings (Q1–Q4), and market catalysts sent to your phone instantly.</div>
+          </div>
+        </div>
+        <a href="https://t.me/Zerolive_news" target="_blank" rel="noopener noreferrer" class="btn-join-telegram-banner" title="Open ZeroLive Telegram Channel">
+          <span>Join @Zerolive_news</span>
+          <span class="tg-arrow">↗</span>
+        </a>
+      </div>
 
       <!-- Filter & Search Toolbar -->
       <section class="control-panel">
@@ -487,6 +514,8 @@
             <span class="footer-dot">•</span>
             <a href="/about#disclaimer" class="footer-link">⚠️ SEBI & Legal Disclaimer</a>
             <span class="footer-dot">•</span>
+            <a href="https://t.me/Zerolive_news" target="_blank" rel="noopener noreferrer" class="footer-link footer-telegram-link" title="Join ZeroLive Telegram Channel">✈️ Telegram (@Zerolive_news)</a>
+            <span class="footer-dot">•</span>
             <a href="/about#contact" class="footer-link">📬 Support</a>
           </div>
           <p class="footer-sources">Aggregating real-time public feeds & statutory filings from NSE India, BSE India, Moneycontrol, Economic Times, Business Standard, LiveMint, Reuters, CNBC, and Yahoo Finance.</p>
@@ -505,6 +534,14 @@
 
   <!-- Toast Notification Container -->
   <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Floating Telegram Wire Channel Button -->
+  <a href="https://t.me/Zerolive_news" target="_blank" rel="noopener noreferrer" class="btn-floating-telegram" id="floatingTelegramBtn" title="Join @Zerolive_news on Telegram" aria-label="Join Telegram Channel">
+    <svg class="floating-tg-icon" width="20" height="20" viewBox="0 0 24 24">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+    </svg>
+    <span class="floating-tg-label">Join Telegram</span>
+  </a>
 
   <!-- Floating Back to Top Button -->
   <button class="btn-back-top hidden" id="backToTopBtn" aria-label="Back to top">

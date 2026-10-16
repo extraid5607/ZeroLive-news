@@ -1012,6 +1012,12 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
     </div>
 
     <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <a href="https://t.me/Zerolive_news" target="_blank" rel="noopener noreferrer" class="btn-action-pill" style="color: #229ED9; border-color: rgba(34, 158, 217, 0.4); text-decoration: none;" title="Join ZeroLive Telegram Wire (@Zerolive_news)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+        </svg>
+        Telegram
+      </a>
       <button id="themeToggleBtn" class="btn-action-pill" style="padding: 0.4rem 0.7rem;" title="Toggle Light/Dark Theme">
         <span id="themeIcon">🌓</span>
       </button>
@@ -1109,6 +1115,20 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
         {f'<a href="{html.escape(link)}" target="_blank" rel="noopener noreferrer" class="btn-read-original">Read Original Full Coverage on {html.escape(source)} ↗</a>' if link else ''}
       </div>
 
+      <!-- Telegram Channel Wire Callout Card -->
+      <div style="margin-top: 1.5rem; padding: 1.15rem 1.4rem; background: linear-gradient(135deg, rgba(14, 34, 61, 0.6) 0%, rgba(10, 14, 23, 0.9) 100%); border: 1px solid rgba(56, 189, 248, 0.3); border-left: 4px solid #229ED9; border-radius: 12px; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+        <div style="display: flex; align-items: center; gap: 0.85rem;">
+          <span style="font-size: 1.5rem;">⚡</span>
+          <div>
+            <div style="font-weight: 700; color: #ffffff; font-size: 0.95rem;">Get Breaking Stock Alerts & Q-Results on Telegram</div>
+            <div style="color: #94a3b8; font-size: 0.82rem;">Real-time 1200x675 image cards and financial filings delivered instantly.</div>
+          </div>
+        </div>
+        <a href="https://t.me/Zerolive_news" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.55rem 1.15rem; background: #229ED9; color: #ffffff; border-radius: 8px; font-weight: 700; font-size: 0.84rem; text-decoration: none; box-shadow: 0 4px 14px rgba(34, 158, 217, 0.35);">
+          Join @Zerolive_news ↗
+        </a>
+      </div>
+
     </article>
 
     <!-- More Market Stories Feed -->
@@ -1122,6 +1142,17 @@ def render_article_html(article: Dict[str, Any], related: List[Dict[str, Any]], 
     ''' if related else ''}
 
   </main>
+
+  <footer class="article-footer" style="max-width: 860px; margin: 0 auto; padding: 2rem 1.25rem 3rem; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; font-size: 0.85rem; color: var(--text-dim);">
+    <div>
+      <strong>ZEROLIVE</strong> — Live Indian Stock Market News Wire & Regulatory Terminal.
+    </div>
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+      <a href="/" style="color: var(--text-secondary); text-decoration: none; font-weight: 600;">⚡ Live Terminal</a>
+      <a href="/about" style="color: var(--text-secondary); text-decoration: none; font-weight: 600;">ℹ️ About</a>
+      <a href="https://t.me/Zerolive_news" target="_blank" rel="noopener noreferrer" style="color: #229ED9; text-decoration: none; font-weight: 700;">✈️ Telegram (@Zerolive_news)</a>
+    </div>
+  </footer>
 
   <div id="toast" class="toast">Link copied to clipboard! ✅</div>
 
