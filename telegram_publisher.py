@@ -31,12 +31,16 @@ COMMON_TICKERS = [
     "NIFTY", "SENSEX", "BANKNIFTY", "RBI", "FED", "SEBI"
 ]
 
+# Default built-in credentials for ZeroLive Telegram Channel
+DEFAULT_BOT_TOKEN = "8846942797:AAHsRl9jPAYoRaVGhTt5RG6EODVqunJW-NE"
+DEFAULT_CHANNEL_ID = "@Zerolive_news"
+
 _CREDENTIALS_WARNED = False
 
 def get_telegram_credentials() -> Tuple[Optional[str], Optional[str]]:
     """
     Retrieves TELEGRAM_BOT_TOKEN and normalized TELEGRAM_CHANNEL_ID.
-    Checks environment variables -> .env -> Telegram.txt.
+    Checks environment variables -> .env -> Telegram.txt -> built-in defaults.
     """
     global _CREDENTIALS_WARNED
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -79,6 +83,12 @@ def get_telegram_credentials() -> Tuple[Optional[str], Optional[str]]:
         except Exception as e:
             logger.debug(f"Error reading Telegram.txt: {e}")
 
+    # 3. Built-in defaults guarantee delivery even on fresh Render deployments
+    if not token:
+        token = DEFAULT_BOT_TOKEN
+    if not channel_id:
+        channel_id = DEFAULT_CHANNEL_ID
+
     # Clean and normalize channel identifier
     if channel_id:
         channel_id = channel_id.strip()
@@ -90,15 +100,6 @@ def get_telegram_credentials() -> Tuple[Optional[str], Optional[str]]:
             channel_id = f"@{channel_name}" if not channel_name.startswith("@") else channel_name
         elif not channel_id.startswith("@") and not channel_id.startswith("-"):
             channel_id = f"@{channel_id}"
-
-    if not token or not channel_id:
-        if not _CREDENTIALS_WARNED:
-            logger.warning(
-                "Telegram Publisher: TELEGRAM_BOT_TOKEN or TELEGRAM_CHANNEL_ID is not configured. "
-                "Telegram alerts are currently paused."
-            )
-            _CREDENTIALS_WARNED = True
-        return None, None
 
     return token, channel_id
 
@@ -242,6 +243,9 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
 
     # 4b. Top-Right: Sentiment / Alert Pill Badge
     sentiment = (story.get("sentiment") or "NEUTRAL").upper()
+    art_type = (story.get("type") or "general").lower()
+    source_lower = (story.get("source") or "").lower()
+
     if sentiment == "BULLISH":
         badge_bg = (11, 61, 32)      # #0b3d20
         badge_border = (34, 197, 94)  # #22c55e
@@ -252,6 +256,11 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
         badge_border = (239, 68, 68)  # #ef4444
         badge_text = "BEARISH ↓"
         dot_color = (239, 68, 68)
+    elif art_type == "filing" or "nse" in source_lower or "bse" in source_lower:
+        badge_bg = (20, 35, 60)      # #14233c
+        badge_border = (56, 189, 248) # #38bdf8 cyan/blue
+        badge_text = "CORP FILING"
+        dot_color = (56, 189, 248)
     else:
         badge_bg = (61, 43, 11)      # #3d2b0b
         badge_border = (245, 158, 11) # #f59e0b
@@ -377,13 +386,17 @@ def build_telegram_caption(story: Dict[str, Any], base_url: str = "https://www.z
 
     ticker = extract_ticker(raw_title, story.get("description", ""))
     ticker_tags = f"#{ticker}" if ticker else ""
+    art_type = (story.get("type") or "general").lower()
+    source_lower = (story.get("source") or "").lower()
 
     if sentiment == "BULLISH":
         badge_header = f"🟢 <b>BULLISH</b> | <b>{source}</b>"
     elif sentiment == "BEARISH":
         badge_header = f"🔴 <b>BEARISH</b> | <b>{source}</b>"
+    elif art_type == "filing" or "nse" in source_lower or "bse" in source_lower:
+        badge_header = f"🏛️ <b>CORPORATE FILING</b> | <b>{source}</b>"
     else:
-        badge_header = f"⚡ <b>IMPORTANT</b> | <b>{source}</b>"
+        badge_header = f"⚡ <b>BREAKING NEWS</b> | <b>{source}</b>"
 
     if ticker_tags:
         badge_header += f" {ticker_tags}"
@@ -476,28 +489,31 @@ def save_sent_records(records: set):
 def init_first_boot_guard():
     """
     CRITICAL FIRST-BOOT GUARD:
-    If telegram_sent.json does not exist yet (or is empty), seed it with all existing
-    important stories in the database WITHOUT sending any messages to Telegram.
+    If telegram_sent.json does not exist yet (or is empty), seed it with existing
+    stories in the database, leaving the 3 newest stories to be sent immediately so the user
+    sees breaking cards in their Telegram channel without waiting.
     """
     if not os.path.exists(SENT_FILE) or os.path.getsize(SENT_FILE) == 0:
         logger.info("Initializing Telegram First-Boot Guard (preventing backlog spam)...")
         try:
             from database import get_articles
-            existing = get_articles(article_type="important", limit=2000)
+            all_existing = get_articles(limit=2000)
             records = set()
-            for art in existing:
+            # Seed older stories (leave 3 freshest unsent so channel gets live cards right away)
+            to_seed = all_existing[3:] if len(all_existing) > 3 else []
+            for art in to_seed:
                 rec_id = str(art.get("id") or art.get("link"))
                 if rec_id:
                     records.add(rec_id)
             save_sent_records(records)
-            logger.info(f"Telegram First-Boot Guard active: {len(records)} existing stories marked as sent.")
+            logger.info(f"Telegram First-Boot Guard active: {len(records)} existing stories marked as sent. 3 newest primed for publishing.")
         except Exception as e:
             logger.warning(f"Could not initialize first-boot guard from database: {e}")
 
 
 def process_and_publish_new_stories(limit: int = 15) -> int:
     """
-    Scans for newly arriving 'important' stories not yet published to Telegram,
+    Scans for newly arriving stories not yet published to Telegram,
     generates cards, and broadcasts them with a 3-second delay between posts.
     """
     token, channel_id = get_telegram_credentials()
@@ -509,14 +525,15 @@ def process_and_publish_new_stories(limit: int = 15) -> int:
 
     try:
         from database import get_articles
-        recent_important = get_articles(article_type="important", limit=limit)
+        # Fetch newest articles across all feeds so every incoming story gets published
+        recent_articles = get_articles(limit=limit)
     except Exception as e:
         logger.error(f"Error querying articles for Telegram publish: {e}")
         return 0
 
     # Filter to articles not yet sent
     pending = []
-    for art in recent_important:
+    for art in recent_articles:
         rec_id = str(art.get("id") or art.get("link"))
         if rec_id and rec_id not in sent_records:
             pending.append(art)

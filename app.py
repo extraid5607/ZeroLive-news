@@ -86,6 +86,12 @@ async def background_news_fetch_loop():
         try:
             logger.info("Background Auto-Fetcher: Syncing Indian & Global market feeds for breaking news...")
             await asyncio.to_thread(fetch_and_store_all_news)
+            # Ensure telegram publisher checks for any pending unsent news
+            try:
+                from telegram_publisher import process_and_publish_new_stories
+                await asyncio.to_thread(process_and_publish_new_stories, 15)
+            except Exception as tg_sync_err:
+                logger.warning(f"Telegram background sync warning: {tg_sync_err}")
         except Exception as e:
             logger.error(f"Error in background news fetch loop: {e}")
         # Automatically wait 120 seconds (2 minutes) before next cycle
@@ -121,10 +127,11 @@ async def on_startup():
     stats = get_stats()
     logger.info(f"Server started. Current database articles: {stats['total_articles']}")
 
-    # Initialize Telegram First-Boot Guard to prevent backlog spam
+    # Initialize Telegram First-Boot Guard and immediately trigger initial publisher
     try:
-        from telegram_publisher import init_first_boot_guard
+        from telegram_publisher import init_first_boot_guard, process_and_publish_new_stories
         await asyncio.to_thread(init_first_boot_guard)
+        asyncio.create_task(asyncio.to_thread(process_and_publish_new_stories, 5))
     except Exception as tg_init_err:
         logger.warning(f"Telegram first-boot guard initialization issue: {tg_init_err}")
 
@@ -422,6 +429,48 @@ async def serve_index():
         logger.warning(f"Failed to inject dynamic JSON-LD schema: {e}")
 
     return HTMLResponse(content=html_content, media_type="text/html")
+
+
+@app.get("/about", response_class=HTMLResponse)
+async def serve_about():
+    """Serves the About and Disclaimer page."""
+    about_file = os.path.join(FRONTEND_DIR, "about.html")
+    if os.path.exists(about_file):
+        with open(about_file, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), media_type="text/html")
+    return HTMLResponse("<h1>ZeroLive About Page Not Found</h1>", status_code=404)
+
+
+@app.get("/news/{article_id}", response_class=HTMLResponse)
+@app.get("/news/{article_id}/{slug}", response_class=HTMLResponse)
+async def serve_article_page(article_id: int, slug: Optional[str] = None):
+    """
+    Dedicated SEO & Social Sharing Article Page.
+    Serves full on-site clean reader with source attribution, WhatsApp Open Graph cards, and JSON-LD schema.
+    """
+    article = await asyncio.to_thread(get_article_by_id, article_id)
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://www.zerolive.in").rstrip("/")
+
+    if not article:
+        not_found_html = render_not_found_html(base_url)
+        return HTMLResponse(content=not_found_html, status_code=404)
+
+    related = await asyncio.to_thread(get_related_articles, article_id, 6)
+    html_content = render_article_html(article, related, base_url)
+    return HTMLResponse(content=html_content, media_type="text/html")
+
+
+@app.get("/api/article/{article_id}/translate")
+async def api_get_article_translation(article_id: int, lang: str = Query("pa", description="Target language code")):
+    """
+    Translates the article title, key takeaways, and story paragraphs into the target language (default Punjabi 'pa').
+    Results are cached in memory for instant delivery.
+    """
+    article = await asyncio.to_thread(get_article_by_id, article_id)
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    data = await asyncio.to_thread(get_article_translation_payload, article, lang)
+    return JSONResponse(content=data)
 
 
 @app.get("/llms.txt", response_class=PlainTextResponse)
