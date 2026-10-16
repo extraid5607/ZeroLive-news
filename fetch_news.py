@@ -681,6 +681,14 @@ def fetch_and_store_all_news() -> Tuple[int, int]:
         except Exception as push_err:
             logger.warning(f"Push notification broadcast issue: {push_err}")
 
+        # Automatically broadcast new Important News stories as sleek cards to Telegram
+        try:
+            from telegram_publisher import process_and_publish_new_stories
+            import threading
+            threading.Thread(target=process_and_publish_new_stories, daemon=True).start()
+        except Exception as tg_err:
+            logger.warning(f"Telegram publish trigger issue: {tg_err}")
+
     stats = get_stats()
     logger.info(f"Database status: {stats['total_articles']} total stored articles. Latest: {stats['latest_article_time']}")
 

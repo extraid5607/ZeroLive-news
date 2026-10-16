@@ -120,6 +120,14 @@ async def on_startup():
 
     stats = get_stats()
     logger.info(f"Server started. Current database articles: {stats['total_articles']}")
+
+    # Initialize Telegram First-Boot Guard to prevent backlog spam
+    try:
+        from telegram_publisher import init_first_boot_guard
+        await asyncio.to_thread(init_first_boot_guard)
+    except Exception as tg_init_err:
+        logger.warning(f"Telegram first-boot guard initialization issue: {tg_init_err}")
+
     # Launch continuous background news scraper task
     asyncio.create_task(background_news_fetch_loop())
     # Launch keep-alive self-ping task to prevent 15-minute idle sleep
@@ -997,6 +1005,13 @@ async def get_market_holidays():
         "count": len(holidays)
     }
 
+@app.get("/api/test-telegram")
+async def trigger_test_telegram():
+    """Triggers a sample breaking news card and caption broadcast to Telegram channel."""
+    from telegram_publisher import test_telegram_alert
+    result = await asyncio.to_thread(test_telegram_alert)
+    return result
+
 @app.get("/healthz")
 @app.get("/api/health")
 async def health_check():
@@ -1008,8 +1023,17 @@ async def health_check():
     }
 
 if __name__ == "__main__":
+    import sys
+    if "--test-telegram" in sys.argv:
+        from telegram_publisher import test_telegram_alert
+        print("Testing Telegram broadcast...")
+        res = test_telegram_alert()
+        print("Result:", res)
+        sys.exit(0 if res.get("status") == "success" else 1)
+
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     host = os.environ.get("HOST", "0.0.0.0")
     logger.info(f"Starting server on {host}:{port}")
     uvicorn.run("app:app", host=host, port=port, reload=False)
+

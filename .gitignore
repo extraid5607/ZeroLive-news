@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv/
+
+# Binary files
+cloudflared.exe
+*.exe
+
+# System
+.DS_Store
+Thumbs.db
+.idea/
+# Environment & Local Data
+.env
+data/*.db
+*.db
+
+*.log
+vapid_private.pem
+Telegram.txt
+Telegram/
+telegram/
+temp_banners/
+telegram_sent.json
