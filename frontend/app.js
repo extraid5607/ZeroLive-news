@@ -1305,11 +1305,11 @@
 
           <div class="card-body">
             ${tickers.length > 0 ? `<div class="card-tickers">${tickerBadges}</div>` : ''}
-            <h2 class="card-title">
+            <h3 class="card-title">
               <a href="${targetHref}" ${targetAttr}>
                 ${escapedTitle}
               </a>
-            </h2>
+            </h3>
             ${escapedDesc ? `<p class="card-description">${escapedDesc}</p>` : ''}
           </div>
 

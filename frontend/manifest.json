@@ -1,22 +1,31 @@
 {
-  "name": "ZeroLive - Live Market News",
+  "name": "ZeroLive – Live Stock Market News Terminal",
   "short_name": "ZeroLive",
+  "description": "Real-time Indian and Global stock market news, NSE/BSE corporate filings, and macro calendar terminal updated every minute.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0a0a0c",
-  "theme_color": "#0a0a0c",
+  "orientation": "portrait-primary",
+  "background_color": "#080c14",
+  "theme_color": "#080c14",
+  "categories": [
+    "finance",
+    "business",
+    "news"
+  ],
   "icons": [
     {
       "src": "/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

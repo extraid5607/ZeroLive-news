@@ -3501,3 +3501,117 @@ body.pwa-installed .btn-install-pwa {
     align-items: flex-start;
   }
 }
+
+/* Accessibility & SEO Heading Helper */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* SEO / FAQ Section */
+.seo-faq-section {
+  margin: 3.5rem 0 2rem;
+  padding: 2rem;
+  background: var(--bg-surface, #101726);
+  border: 1px solid var(--border-subtle, #1e293b);
+  border-radius: 14px;
+}
+
+.faq-header {
+  margin-bottom: 1.75rem;
+}
+
+.faq-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #00e676;
+  text-transform: uppercase;
+  margin-bottom: 0.5rem;
+}
+
+.faq-heading {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-primary, #f8fafc);
+  margin: 0 0 0.5rem;
+}
+
+.faq-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+}
+
+.faq-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.faq-card {
+  background: var(--bg-surface-2, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  padding: 1.25rem;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.faq-card:hover {
+  border-color: rgba(0, 230, 118, 0.35);
+  transform: translateY(-2px);
+}
+
+.faq-q {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary, #f8fafc);
+  margin: 0 0 0.65rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.faq-q::before {
+  content: 'Q:';
+  color: #00e676;
+  font-family: var(--font-mono, monospace);
+  font-weight: 800;
+}
+
+.faq-a {
+  font-size: 0.88rem;
+  color: var(--text-secondary, #94a3b8);
+  line-height: 1.6;
+  margin: 0;
+}
+
+[data-theme="light"] .seo-faq-section {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .faq-card {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .faq-q {
+  color: #0f172a;
+}
+
+[data-theme="light"] .faq-a {
+  color: #475569;
+}

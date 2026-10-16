@@ -1,9 +1,12 @@
 import os
+import re
 import json
+import html
 import asyncio
 import logging
 import time
 import requests
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 from fastapi import FastAPI, Query, BackgroundTasks, HTTPException, Header, Request
@@ -122,120 +125,464 @@ async def on_startup():
     # Launch keep-alive self-ping task to prevent 15-minute idle sleep
     asyncio.create_task(keep_alive_ping_loop())
 
+def generate_ssr_homepage_html(base_html: str, base_url: str, articles: List[Dict[str, Any]]) -> str:
+    """
+    Server-Side Pre-Renders the latest 20 important market news stories into the DOM
+    so search engines, AI crawlers, and page-source scrapers immediately index real headlines.
+    """
+    if not articles:
+        return base_html
+
+    card_items = []
+    for index, art in enumerate(articles[:20]):
+        art_id = art.get("id", index)
+        title = html.escape(art.get("title", ""))
+        desc = html.escape(art.get("description") or "Click to read the complete corporate filing and market analysis on ZeroLive.")
+        source = html.escape(art.get("source") or art.get("feed_name") or "Market Wire")
+        sentiment = (art.get("sentiment") or "NEUTRAL").upper()
+
+        if sentiment == "BULLISH":
+            sentiment_badge = '<span class="badge-sentiment sentiment-bullish">BULLISH 📈</span>'
+        elif sentiment == "BEARISH":
+            sentiment_badge = '<span class="badge-sentiment sentiment-bearish">BEARISH 📉</span>'
+        else:
+            sentiment_badge = '<span class="badge-sentiment sentiment-neutral">NEUTRAL ⚖️</span>'
+
+        slug = slugify_title(art.get("title", ""))
+        on_site_url = f"/news/{art_id}/{slug}"
+        pub_iso = art.get("published_at") or datetime.now(timezone.utc).isoformat()
+
+        src_lower = source.lower()
+        if "nse" in src_lower or "bse" in src_lower:
+            src_class = "source-exchange"
+        elif "moneycontrol" in src_lower:
+            src_class = "source-mc"
+        elif "economic" in src_lower:
+            src_class = "source-et"
+        elif "business" in src_lower:
+            src_class = "source-bs"
+        elif "bloomberg" in src_lower or "reuters" in src_lower:
+            src_class = "source-global"
+        else:
+            src_class = "source-default"
+
+        card_html = f"""
+        <article class="news-card sentiment-{sentiment}" data-index="{index}" data-link="{html.escape(art.get('link', ''))}">
+          <header class="card-header">
+            <div class="card-badges">
+              <span class="badge-source {src_class}">{source}</span>
+              {sentiment_badge}
+            </div>
+            <time class="card-time" datetime="{pub_iso}">
+              Live Wire
+            </time>
+          </header>
+          <div class="card-body">
+            <h3 class="card-title">
+              <a href="{on_site_url}">
+                {title}
+              </a>
+            </h3>
+            <p class="card-description">{desc}</p>
+          </div>
+          <footer class="card-footer">
+            <a href="{on_site_url}" class="card-link-out">
+              Read Story ↗
+            </a>
+            <div class="card-actions">
+              <button class="btn-card-action btn-card-audio" data-index="{index}" title="Listen to news" aria-label="Listen"><span>🔊</span></button>
+              <button class="btn-card-action btn-card-tldr" data-index="{index}" title="3-Bullet Instant Takeaway" aria-label="Instant Takeaway"><span>⚡</span></button>
+            </div>
+          </footer>
+        </article>"""
+        card_items.append(card_html)
+
+    rendered_cards = "\n".join(card_items)
+
+    result_html = base_html.replace(
+        '<div class="skeleton-grid" id="skeletonGrid">',
+        '<div class="skeleton-grid hidden" id="skeletonGrid">'
+    )
+    result_html = result_html.replace(
+        '<div class="news-grid hidden" id="newsGrid"></div>',
+        f'<div class="news-grid" id="newsGrid">\n{rendered_cards}\n</div>'
+    )
+    return result_html
+
+
+def generate_json_ld_schemas(base_url: str, articles: List[Dict[str, Any]]) -> str:
+    """
+    Constructs comprehensive Schema.org JSON-LD structured data for Google News,
+    Search Knowledge Graph, and Generative AI Answer Engines (Perplexity, ChatGPT).
+    """
+    website_schema = {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "@id": f"{base_url}/#website",
+        "name": "ZeroLive",
+        "alternateName": ["ZeroLive Terminal", "ZeroLive News", "ZeroLive Stock Wire"],
+        "url": f"{base_url}/",
+        "description": "Real-time Indian and Global stock market news, NSE/BSE corporate filings, and macro financial intelligence terminal.",
+        "publisher": {
+            "@id": f"{base_url}/#organization"
+        },
+        "potentialAction": {
+            "@type": "SearchAction",
+            "target": f"{base_url}/?search={{search_term_string}}",
+            "query-input": "required name=search_term_string"
+        }
+    }
+
+    org_schema = {
+        "@context": "https://schema.org",
+        "@type": "NewsMediaOrganization",
+        "@id": f"{base_url}/#organization",
+        "name": "ZeroLive",
+        "url": f"{base_url}/",
+        "logo": {
+            "@type": "ImageObject",
+            "url": f"{base_url}/preview.png",
+            "width": 1200,
+            "height": 630
+        },
+        "image": f"{base_url}/preview.png",
+        "sameAs": [
+            "https://t.me/ZeroBreakout"
+        ],
+        "knowsAbout": [
+            "NSE India",
+            "BSE India",
+            "Nifty 50 Index",
+            "Sensex",
+            "Corporate Disclosures and Statutory Filings",
+            "Reserve Bank of India Monetary Policy Committee",
+            "Federal Reserve FOMC",
+            "Indian Stock Market News",
+            "AI Bullish and Bearish Sentiment Signals"
+        ]
+    }
+
+    item_list_elements = []
+    for i, art in enumerate(articles[:15], start=1):
+        slug = slugify_title(art.get("title", ""))
+        art_url = f"{base_url}/news/{art.get('id', i)}/{slug}"
+        pub_iso = art.get("published_at") or datetime.now(timezone.utc).isoformat()
+        item_list_elements.append({
+            "@type": "ListItem",
+            "position": i,
+            "item": {
+                "@type": "NewsArticle",
+                "@id": art_url,
+                "url": art_url,
+                "mainEntityOfPage": art_url,
+                "headline": (art.get("title") or "Market News")[:110],
+                "description": (art.get("description") or art.get("title") or "Live Indian market news and exchange filing update.")[:250],
+                "datePublished": pub_iso,
+                "dateModified": pub_iso,
+                "image": [f"{base_url}/preview.png"],
+                "author": {
+                    "@type": "Organization",
+                    "name": art.get("source") or "ZeroLive Wire"
+                },
+                "publisher": {
+                    "@type": "NewsMediaOrganization",
+                    "name": "ZeroLive",
+                    "url": f"{base_url}/",
+                    "logo": {
+                        "@type": "ImageObject",
+                        "url": f"{base_url}/preview.png"
+                    }
+                }
+            }
+        })
+
+    item_list_schema = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "name": "Top Live Indian Stock Market News & Corporate Filings",
+        "itemListElement": item_list_elements
+    }
+
+    faq_schema = {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        "mainEntity": [
+            {
+                "@type": "Question",
+                "name": "Where can I track live NSE/BSE corporate filings and bullish/bearish signals in real time?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "ZeroLive (www.zerolive.in) continuously aggregates, categorizes, and filters official exchange corporate filings, regulatory disclosures, and market news from NSE and BSE every 5 minutes with AI-analyzed bullish/bearish sentiment tags."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "When is the next RBI MPC and US Federal Reserve interest rate decision?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "The Reserve Bank of India (RBI) Monetary Policy Committee (MPC) and US Federal Open Market Committee (FOMC) interest rate schedules are updated live in the ZeroLive Economic & Policy Calendar with projected versus actual rate metrics."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "Which Indian stock market holidays are coming up on NSE and BSE?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "ZeroLive tracks the official trading holiday schedule for NSE (National Stock Exchange) and BSE (Bombay Stock Exchange) for equity, derivative, and currency segments, highlighting upcoming trading closures and Muhurat trading dates."
+                }
+            },
+            {
+                "@type": "Question",
+                "name": "How often is market news updated on ZeroLive?",
+                "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": "ZeroLive updates continuously every 60 seconds with an autonomous multi-feed stream covering Moneycontrol, Economic Times, Bloomberg, Reuters, CNBC-TV18, Business Standard, and statutory exchange filings."
+                }
+            }
+        ]
+    }
+
+    event_schemas = []
+    try:
+        raw_events = get_key_events()
+        for ev in raw_events[:5]:
+            ev_date = ev.get("event_date") or ""
+            if ev_date:
+                event_schemas.append({
+                    "@context": "https://schema.org",
+                    "@type": "Event",
+                    "name": ev.get("event_name"),
+                    "startDate": ev_date,
+                    "description": ev.get("description") or f"{ev.get('event_name')} - High-Impact Market Catalyst",
+                    "location": {
+                        "@type": "Place",
+                        "name": ev.get("country", "India")
+                    },
+                    "organizer": {
+                        "@type": "Organization",
+                        "name": "Reserve Bank of India" if "RBI" in ev.get("event_name", "") else "Financial Regulatory Body"
+                    }
+                })
+    except Exception as e:
+        logger.warning(f"Error preparing Event schema: {e}")
+
+    scripts = [
+        f'<script type="application/ld+json">\n{json.dumps(website_schema, ensure_ascii=False, indent=2)}\n</script>',
+        f'<script type="application/ld+json">\n{json.dumps(org_schema, ensure_ascii=False, indent=2)}\n</script>',
+        f'<script type="application/ld+json">\n{json.dumps(item_list_schema, ensure_ascii=False, indent=2)}\n</script>',
+        f'<script type="application/ld+json">\n{json.dumps(faq_schema, ensure_ascii=False, indent=2)}\n</script>'
+    ]
+    for es in event_schemas:
+        scripts.append(f'<script type="application/ld+json">\n{json.dumps(es, ensure_ascii=False, indent=2)}\n</script>')
+
+    return "\n  ".join(scripts)
+
+
 @app.get("/", response_class=HTMLResponse)
 async def serve_index():
-    """Serves the main application frontend with dynamic JSON-LD structured data."""
+    """Serves the main application frontend with dynamic Server-Side Pre-Rendering (SSR) and Schema.org JSON-LD structured data."""
     index_file = os.path.join(FRONTEND_DIR, "index.html")
     if not os.path.exists(index_file):
         return HTMLResponse("<h1>ZeroLive Frontend not found</h1>", status_code=404)
     
     with open(index_file, "r", encoding="utf-8") as f:
-        html = f.read()
+        html_content = f.read()
 
-    # Dynamically inject JSON-LD ItemList populated with current real articles
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://www.zerolive.in").rstrip("/")
+
+    # Fetch top important articles for SSR pre-rendering and JSON-LD schema
     try:
-        articles = get_articles(article_type="important", limit=25)
+        articles = await asyncio.to_thread(get_articles, "important", None, None, None, 25, 0)
         if not articles:
-            articles = get_articles(limit=25)
-        item_list_elements = []
-        for i, art in enumerate(articles, start=1):
-            item_list_elements.append({
-                "@type": "ListItem",
-                "position": i,
-                "url": art.get("link") or "https://zerolive.in/",
-                "name": art.get("title") or "Market News"
-            })
+            articles = await asyncio.to_thread(get_articles, None, None, None, None, 25, 0)
+    except Exception as e:
+        logger.warning(f"Error fetching articles for SSR: {e}")
+        articles = []
 
-        json_ld_data = {
-            "@context": "https://schema.org",
-            "@type": "ItemList",
-            "itemListElement": item_list_elements
-        }
-        json_ld_script = (
-            '<script type="application/ld+json">\n'
-            + json.dumps(json_ld_data, ensure_ascii=False, indent=2)
-            + '\n</script>'
-        )
+    # 1. Server-Side Pre-Render News Cards into the HTML DOM for Search Crawlers
+    try:
+        html_content = generate_ssr_homepage_html(html_content, base_url, articles)
+    except Exception as e:
+        logger.warning(f"Error generating SSR HTML: {e}")
 
-        if "</head>" in html:
-            html = html.replace("</head>", f"  {json_ld_script}\n</head>", 1)
+    # 2. Inject comprehensive Schema.org JSON-LD scripts (WebSite, Org, ItemList, FAQPage, Events)
+    try:
+        json_ld_scripts = generate_json_ld_schemas(base_url, articles)
+        if "</head>" in html_content:
+            html_content = html_content.replace("</head>", f"  {json_ld_scripts}\n</head>", 1)
     except Exception as e:
         logger.warning(f"Failed to inject dynamic JSON-LD schema: {e}")
 
-    return HTMLResponse(content=html, media_type="text/html")
-
-@app.get("/about", response_class=HTMLResponse)
-async def serve_about():
-    """Serves the ZeroLive About & Regulatory Disclaimer page."""
-    about_file = os.path.join(FRONTEND_DIR, "about.html")
-    if os.path.exists(about_file):
-        with open(about_file, "r", encoding="utf-8") as f:
-            return HTMLResponse(content=f.read(), media_type="text/html")
-    return HTMLResponse("<h1>ZeroLive About Page Not Found</h1>", status_code=404)
-
-@app.get("/news/{article_id}", response_class=HTMLResponse)
-@app.get("/news/{article_id}/{slug}", response_class=HTMLResponse)
-async def serve_article_page(article_id: int, slug: Optional[str] = None):
-    """
-    Dedicated SEO & Social Sharing Article Page.
-    Serves full on-site clean reader with source attribution, WhatsApp Open Graph cards, and JSON-LD schema.
-    """
-    article = await asyncio.to_thread(get_article_by_id, article_id)
-    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://www.zerolive.in").rstrip("/")
-
-    if not article:
-        not_found_html = render_not_found_html(base_url)
-        return HTMLResponse(content=not_found_html, status_code=404)
-
-    related = await asyncio.to_thread(get_related_articles, article_id, 6)
-    html_content = render_article_html(article, related, base_url)
     return HTMLResponse(content=html_content, media_type="text/html")
 
-@app.get("/api/article/{article_id}/translate")
-async def api_get_article_translation(article_id: int, lang: str = Query("pa", description="Target language code")):
+
+@app.get("/llms.txt", response_class=PlainTextResponse)
+async def serve_llms_txt():
     """
-    Translates the article title, key takeaways, and story paragraphs into the target language (default Punjabi 'pa').
-    Results are cached in memory for instant delivery.
+    Standard llms.txt endpoint for Generative AI engines (ChatGPT, Claude, Perplexity, Gemini).
+    Provides a real-time, LLM-optimized summary of ZeroLive market feeds, current indices, top headlines, and catalysts.
     """
-    article = await asyncio.to_thread(get_article_by_id, article_id)
-    if not article:
-        raise HTTPException(status_code=404, detail="Article not found")
-    data = await asyncio.to_thread(get_article_translation_payload, article, lang)
-    return JSONResponse(content=data)
+    base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://www.zerolive.in").rstrip("/")
+    indices = await asyncio.to_thread(get_live_market_indices)
+    articles = await asyncio.to_thread(get_articles, "important", None, None, None, 10, 0)
+    if not articles:
+        articles = await asyncio.to_thread(get_articles, None, None, None, None, 10, 0)
+    events = await asyncio.to_thread(get_key_events)
+
+    lines = [
+        "# ZeroLive — Real-Time Indian Stock Market & Corporate News Wire",
+        f"> Canonical URL: {base_url}/",
+        "> Ingestion Cadence: Continuous multi-feed auto-sync (every 60 seconds)",
+        "> Core Focus: NSE/BSE Equities, Corporate Disclosures, Nifty 50, Sensex, AI Sentiment Signals, RBI MPC & Macro Catalysts",
+        "",
+        "## About ZeroLive",
+        "ZeroLive (https://www.zerolive.in) is an ultra-fast, professional market news terminal engineered for Indian traders and investors. It aggregates verified financial reports and statutory regulatory filings from NSE India, BSE India, Moneycontrol, Economic Times, Business Standard, LiveMint, Reuters, CNBC-TV18, and Yahoo Finance with automated bullish/bearish technical structure sentiment classification.",
+        "",
+        "## Current Live Market Indices Snapshot"
+    ]
+
+    for item in indices:
+        name = item.get("name", "")
+        price = item.get("price", "N/A")
+        change = item.get("change", "0.0")
+        pct = item.get("change_pct", "0.0%")
+        lines.append(f"- {name}: ₹{price} ({change}, {pct})")
+
+    lines.extend([
+        "",
+        "## Top 10 Latest Important Market Headlines (Live)",
+    ])
+
+    for i, art in enumerate(articles, start=1):
+        title = art.get("title", "").strip()
+        source = art.get("source", "ZeroLive Wire")
+        sentiment = (art.get("sentiment") or "NEUTRAL").upper()
+        pub = art.get("published_at", "")
+        slug = slugify_title(title)
+        art_url = f"{base_url}/news/{art.get('id', i)}/{slug}"
+        desc = (art.get("description") or "").strip()
+        lines.append(f"### {i}. [{sentiment}] {title}")
+        lines.append(f"- Source: {source} | Time: {pub}")
+        if desc:
+            lines.append(f"- Summary: {desc[:280]}")
+        lines.append(f"- Read Full Story: {art_url}")
+        lines.append("")
+
+    if events:
+        lines.extend([
+            "## Upcoming High-Impact Economic & Policy Events",
+        ])
+        for ev in events[:6]:
+            ev_name = ev.get("event_name", "")
+            ev_date = ev.get("event_date", "")
+            ev_country = ev.get("country", "India")
+            ev_desc = ev.get("description", "")
+            lines.append(f"- [{ev_date}] ({ev_country}) {ev_name}: {ev_desc}")
+        lines.append("")
+
+    lines.extend([
+        "## Primary Canonical & Sitemap Resources",
+        f"- Live Terminal: {base_url}/",
+        f"- About & Disclaimers: {base_url}/about",
+        f"- XML Sitemap: {base_url}/sitemap.xml",
+        f"- Robots Rules: {base_url}/robots.txt",
+        "",
+        "---",
+        "Generated dynamically by ZeroLive Engine. For educational & financial informational purposes only."
+    ])
+
+    return PlainTextResponse("\n".join(lines), media_type="text/plain; charset=utf-8")
+
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
 async def serve_robots():
-    """Returns robots.txt for search engine crawlers."""
+    """Returns robots.txt for search engines and AI crawlers."""
     robots_file = os.path.join(FRONTEND_DIR, "robots.txt")
     if os.path.exists(robots_file):
         with open(robots_file, "r", encoding="utf-8") as f:
             return PlainTextResponse(f.read(), media_type="text/plain")
-    return PlainTextResponse("User-agent: *\nAllow: /\nSitemap: https://www.zerolive.in/sitemap.xml\n", media_type="text/plain")
+    fallback = """User-agent: *
+Allow: /
+Allow: /news/
+Allow: /about
+Allow: /llms.txt
+Allow: /sitemap.xml
+Disallow: /api/
+
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-News
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+Sitemap: https://www.zerolive.in/sitemap.xml
+"""
+    return PlainTextResponse(fallback, media_type="text/plain")
+
 
 @app.get("/sitemap.xml")
 async def serve_sitemap():
-    """Generates and returns live dynamic sitemap XML with latest articles."""
+    """Generates and returns live dynamic sitemap XML with latest articles and proper lastmod dates."""
     base_url = os.environ.get("RENDER_EXTERNAL_URL", "https://www.zerolive.in").rstrip("/")
     articles = await asyncio.to_thread(get_articles, None, None, None, None, 100, 0)
+
+    now_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    latest_art_date = articles[0].get("published_at") if articles else now_iso
+    if latest_art_date and " " in latest_art_date and "T" not in latest_art_date:
+        latest_art_date = latest_art_date.replace(" ", "T") + "Z"
+    elif latest_art_date and not latest_art_date.endswith("Z"):
+        latest_art_date = latest_art_date + "Z"
 
     xml_entries = [
         f"""  <url>
     <loc>{base_url}/</loc>
+    <lastmod>{latest_art_date or now_iso}</lastmod>
     <changefreq>always</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>{base_url}/about</loc>
-    <changefreq>monthly</changefreq>
+    <lastmod>{now_iso}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>{base_url}/llms.txt</loc>
+    <lastmod>{now_iso}</lastmod>
+    <changefreq>hourly</changefreq>
     <priority>0.8</priority>
   </url>"""
     ]
 
     for art in articles:
         slug = slugify_title(art.get("title", ""))
+        art_date = art.get("published_at") or now_iso
+        if art_date and " " in art_date and "T" not in art_date:
+            art_date = art_date.replace(" ", "T") + "Z"
+        elif art_date and not art_date.endswith("Z"):
+            art_date = art_date + "Z"
         xml_entries.append(f"""  <url>
     <loc>{base_url}/news/{art['id']}/{slug}</loc>
-    <changefreq>daily</changefreq>
+    <lastmod>{art_date}</lastmod>
+    <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>""")
 

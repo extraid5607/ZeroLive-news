@@ -1,3 +1,46 @@
 User-agent: *
 Allow: /
-Sitemap: https://zerolive.in/sitemap.xml
+Allow: /news/
+Allow: /about
+Allow: /llms.txt
+Allow: /sitemap.xml
+Disallow: /api/
+
+# Explicit Bot Directives for Search Engines & Generative AI Crawlers
+User-agent: Googlebot
+Allow: /
+Allow: /news/
+
+User-agent: Googlebot-News
+Allow: /
+Allow: /news/
+
+User-agent: GPTBot
+Allow: /
+Allow: /news/
+Allow: /llms.txt
+
+User-agent: ChatGPT-User
+Allow: /
+Allow: /news/
+Allow: /llms.txt
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /news/
+Allow: /llms.txt
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /news/
+Allow: /llms.txt
+
+User-agent: Applebot
+Allow: /
+Allow: /news/
+
+User-agent: Bingbot
+Allow: /
+Allow: /news/
+
+Sitemap: https://www.zerolive.in/sitemap.xml

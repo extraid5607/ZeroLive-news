@@ -3,28 +3,48 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ZeroLive – Live Stock Market News, NSE & BSE Updates Every 5 Minutes</title>
-  <meta name="description" content="Real-time Indian and global stock market news from Economic Times, Business Standard, Yahoo Finance, CNBC and more — updated every 5 minutes.">
-  <meta name="keywords" content="stock market news, NSE, BSE, live market news, Indian stock market, share market news">
+  <title>ZeroLive – Live Indian Stock Market News, NSE/BSE Filings & Global Macro Terminal</title>
+  <meta name="description" content="Real-time Indian and Global stock market news updated every 5 minutes. Track live Nifty 50, Sensex, NSE/BSE corporate filings, Bullish/Bearish AI signals, RBI/Fed policy decisions, and high-impact economic calendars.">
+  <meta name="keywords" content="live stock market news India, NSE BSE corporate filings live, Nifty 50 live news terminal, bullish bearish stock signals, RBI MPC calendar, real-time market wire India, Indian stock market news, Sensex today, share market news live, corporate announcements NSE">
+  <link rel="canonical" href="https://www.zerolive.in/">
 
-  <!-- Open Graph (for WhatsApp/Telegram/social link previews) -->
-  <meta property="og:title" content="ZeroLive – Live Market News">
-  <meta property="og:description" content="Live market news, every minute.">
-  <meta property="og:image" content="https://zerolive.in/preview.png">
-  <meta property="og:url" content="https://zerolive.in">
+  <!-- Search Engine & Generative AI Crawler Directives -->
+  <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+  <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+
+  <!-- Open Graph / WhatsApp / Telegram Preview Cards -->
+  <meta property="og:site_name" content="ZeroLive">
   <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.zerolive.in/">
+  <meta property="og:title" content="ZeroLive – Live Indian Stock Market News, NSE/BSE Filings & Global Macro Terminal">
+  <meta property="og:description" content="Real-time Indian and Global stock market news updated every 5 minutes. Track live Nifty 50, Sensex, NSE/BSE corporate filings, Bullish/Bearish AI signals, RBI/Fed policy decisions, and high-impact economic calendars.">
+  <meta property="og:image" content="https://www.zerolive.in/preview.png">
+  <meta property="og:image:secure_url" content="https://www.zerolive.in/preview.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="ZeroLive Live Indian Stock Market News Terminal">
+  <meta property="og:locale" content="en_IN">
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="ZeroLive – Live Market News">
-  <meta name="twitter:description" content="Live market news, every minute.">
-  <meta name="twitter:image" content="https://zerolive.in/preview.png">
+  <meta name="twitter:site" content="@ZeroLive">
+  <meta name="twitter:creator" content="@ZeroLive">
+  <meta name="twitter:url" content="https://www.zerolive.in/">
+  <meta name="twitter:title" content="ZeroLive – Live Indian Stock Market News, NSE/BSE Filings & Global Macro Terminal">
+  <meta name="twitter:description" content="Real-time Indian and Global stock market news updated every 5 minutes. Track live Nifty 50, Sensex, NSE/BSE corporate filings, Bullish/Bearish AI signals, RBI/Fed policy decisions, and high-impact economic calendars.">
+  <meta name="twitter:image" content="https://www.zerolive.in/preview.png">
 
-  <link rel="canonical" href="https://zerolive.in">
+  <!-- Core Web Vitals & Resource Preconnects -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+  <link rel="dns-prefetch" href="https://fonts.gstatic.com">
 
   <!-- PWA Web App Manifest & Theme Color -->
   <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#0a0a0c">
+  <meta name="theme-color" content="#080c14">
 
   <!-- iOS PWA Specific Meta Tags -->
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
@@ -32,13 +52,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="ZeroLive">
 
-
   <!-- Google Fonts: Syne / Space Grotesk for display, Inter for high-readability body -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="/static/style.css?v=4.7">
+  <link rel="stylesheet" href="/static/style.css?v=4.8">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
   <script>
     // Register Service Worker for ZeroLive Web Push Notifications
@@ -72,7 +88,7 @@
             </svg>
           </div>
           <div class="brand-text">
-            <h1 class="brand-title">Zero<span class="accent-live">Live</span></h1>
+            <h1 class="brand-title">Zero<span class="accent-live">Live</span> <span class="sr-only">– Live Indian Stock Market News, NSE/BSE Filings & Global Macro Terminal</span></h1>
             <p class="brand-tagline">Live market news, every minute</p>
           </div>
         </div>
@@ -166,7 +182,8 @@
     </header>
 
     <!-- Main Content Stream Area -->
-    <main class="main-content">
+    <main class="main-content" id="mainContent">
+      <h2 class="sr-only" id="mainFeedHeading">Live Indian Stock Market News Wire, NSE/BSE Corporate Filings & AI Signals</h2>
       <!-- Live Sync / Connection Alert Banner (Rendered dynamically via JS only after failed retries) -->
       <div class="connection-banner hidden" id="connectionBanner" role="status" aria-live="polite"></div>
 
@@ -301,6 +318,7 @@
 
       <!-- Dedicated Key Events & Economic Calendar Container (Visible when Key Events Tab is active) -->
       <div class="events-wrapper hidden" id="eventsWrapper">
+        <h2 class="sr-only">High-Impact Economic Calendar & Exchange Trading Holidays</h2>
         <!-- Sub-Navigation Switcher (Economic / Holidays / Policy Decisions) -->
         <div class="calendar-header-bar">
           <div class="calendar-subnav" role="tablist">
@@ -426,6 +444,33 @@
           <button class="btn-primary" id="emptyResetBtn">Show All Stories</button>
         </div>
       </div>
+
+      <!-- FAQ & Market Knowledge Base Section for SEO / AEO / GEO -->
+      <section class="seo-faq-section" aria-labelledby="faqHeading">
+        <div class="faq-header">
+          <div class="faq-badge">⚡ TRADER KNOWLEDGE BASE</div>
+          <h2 class="faq-heading" id="faqHeading">Frequently Asked Questions — Stock Market News & Signals</h2>
+          <p class="faq-subtitle">Essential answers on real-time Indian stock market feeds, exchange filings, and macro schedules.</p>
+        </div>
+        <div class="faq-grid">
+          <div class="faq-card">
+            <h3 class="faq-q">Where can I track live NSE/BSE corporate filings and bullish/bearish signals in real time?</h3>
+            <p class="faq-a">ZeroLive (www.zerolive.in) continuously aggregates, categorizes, and filters official exchange corporate filings, regulatory disclosures, and market news from NSE and BSE every 5 minutes with AI-analyzed bullish/bearish sentiment tags.</p>
+          </div>
+          <div class="faq-card">
+            <h3 class="faq-q">When is the next RBI MPC and US Federal Reserve interest rate decision?</h3>
+            <p class="faq-a">The Reserve Bank of India (RBI) Monetary Policy Committee (MPC) and US Federal Open Market Committee (FOMC) interest rate schedules are updated live in the ZeroLive Economic & Policy Calendar with projected versus actual rate metrics.</p>
+          </div>
+          <div class="faq-card">
+            <h3 class="faq-q">Which Indian stock market holidays are coming up on NSE and BSE?</h3>
+            <p class="faq-a">ZeroLive tracks the official trading holiday schedule for NSE (National Stock Exchange) and BSE (Bombay Stock Exchange) for equity, derivative, and currency segments, highlighting upcoming trading closures and Muhurat trading dates.</p>
+          </div>
+          <div class="faq-card">
+            <h3 class="faq-q">How often is market news updated on ZeroLive?</h3>
+            <p class="faq-a">ZeroLive updates continuously every 60 seconds with an autonomous multi-feed stream covering Moneycontrol, Economic Times, Bloomberg, Reuters, CNBC-TV18, Business Standard, and statutory exchange filings.</p>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- Footer -->
