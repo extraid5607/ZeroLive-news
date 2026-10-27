@@ -487,11 +487,10 @@ def generate_telegram_card(story: Dict[str, Any]) -> str:
     return output_path
 
 
-def build_telegram_caption(story: Dict[str, Any], base_url: str = "https://www.zerolive.in") -> str:
+def build_telegram_message(story: Dict[str, Any], base_url: str = "https://www.zerolive.in") -> str:
     """
-    Constructs an ultra-clean, minimal, clutter-free Telegram photo caption.
-    All key story context is already rendered in the generated image card,
-    so the caption stays punchy, fast to read, and un-cluttered.
+    Constructs an ultra-clean, minimal, clutter-free Telegram text message.
+    Highlights the primary headline and context without image bloat.
     """
     raw_title = clean_raw_text(story.get("title") or "Market Update")
     escaped_title = html.escape(raw_title)
@@ -525,6 +524,16 @@ def build_telegram_caption(story: Dict[str, Any], base_url: str = "https://www.z
     if ticker_tags:
         badge_header += f" {ticker_tags}"
 
+    # Summary/Context - extracted cleanly
+    raw_desc = clean_raw_text(story.get("description") or "")
+    desc_section = ""
+    # Avoid duplicate text if summary is the same as title
+    if raw_desc and raw_desc.strip().lower() != raw_title.strip().lower():
+        # Keep it concise (up to 300 chars)
+        if len(raw_desc) > 300:
+            raw_desc = raw_desc[:297].rstrip() + "..."
+        desc_section = f"\n\n{html.escape(raw_desc)}"
+
     # Generate canonical story URL
     slug = re.sub(r'[^a-z0-9]+', '-', raw_title.lower()).strip('-')[:80]
     story_id = story.get("id")
@@ -533,13 +542,46 @@ def build_telegram_caption(story: Dict[str, Any], base_url: str = "https://www.z
     else:
         story_url = story.get("link") or base_url
 
-    # Clean, uncluttered, professional caption
-    caption = (
+    # Clean, uncluttered, professional text message
+    message = (
         f"{badge_header}\n\n"
-        f"📰 <b>{escaped_title}</b>\n\n"
+        f"📰 <b>{escaped_title}</b>"
+        f"{desc_section}\n\n"
         f'⚡ <a href="{story_url}"><b>Read Full Story on ZeroLive Terminal ↗</b></a>'
     )
-    return caption
+    return message
+
+
+# Alias for backward compatibility
+build_telegram_caption = build_telegram_message
+
+
+def send_telegram_message(text: str, disable_web_page_preview: bool = True) -> bool:
+    """Sends a clean text message to the Telegram channel using sendMessage without image."""
+    token, channel_id = get_telegram_credentials()
+    if not token or not channel_id:
+        logger.warning("Telegram Bot Token or Channel ID is missing. Skipping Telegram broadcast.")
+        return False
+
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {
+        "chat_id": channel_id,
+        "text": text,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": disable_web_page_preview,
+        "link_preview_options": {"is_disabled": disable_web_page_preview}
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=20)
+        if resp.status_code == 200:
+            logger.info(f"Telegram text alert successfully broadcasted to {channel_id}")
+            return True
+        else:
+            logger.error(f"Telegram sendMessage API error ({resp.status_code}): {resp.text}")
+            return False
+    except Exception as e:
+        logger.error(f"Exception sending text message to Telegram: {e}")
+        return False
 
 
 def send_telegram_photo(image_path: str, caption: str) -> bool:
@@ -728,13 +770,10 @@ def process_and_publish_new_stories(limit: int = 15) -> int:
             rec_link = str(story.get("link") or "").strip()
             title = (story.get("title") or "").strip()
             t_hash = normalize_title_hash(title)
-            image_path = None
             try:
-                logger.info(f"Generating Telegram breaking card for story #{story.get('id')}: {title[:60]}...")
-                image_path = generate_telegram_card(story)
-                caption = build_telegram_caption(story)
-
-                success = send_telegram_photo(image_path, caption)
+                logger.info(f"Publishing Telegram text alert for story #{story.get('id')}: {title[:60]}...")
+                message_text = build_telegram_message(story)
+                success = send_telegram_message(message_text, disable_web_page_preview=True)
                 if success:
                     published_count += 1
                     # Persist to both database AND json file
@@ -747,18 +786,12 @@ def process_and_publish_new_stories(limit: int = 15) -> int:
                     if t_hash:
                         _SENT_TITLES.add(t_hash)
                     save_sent_records(_SENT_IDS)
-                    logger.info(f"Successfully posted breaking card to Telegram for #{story.get('id')}")
-                    time.sleep(3)
+                    logger.info(f"Successfully posted text alert to Telegram for #{story.get('id')}")
+                    time.sleep(2)
                 else:
-                    logger.warning(f"Failed to post story #{story.get('id')} to Telegram.")
+                    logger.warning(f"Failed to post text alert for story #{story.get('id')} to Telegram.")
             except Exception as err:
                 logger.error(f"Error processing story for Telegram: {err}")
-            finally:
-                if image_path and os.path.exists(image_path):
-                    try:
-                        os.remove(image_path)
-                    except Exception:
-                        pass
 
         return published_count
     finally:
@@ -767,8 +800,8 @@ def process_and_publish_new_stories(limit: int = 15) -> int:
 
 def test_telegram_alert() -> Dict[str, Any]:
     """
-    Generates and sends 1 sample card using the latest important story
-    (or a mock story if empty) to verify the Telegram integration immediately.
+    Sends 1 sample text alert using the latest important story
+    (or a mock story if empty) to verify the Telegram integration immediately without images.
     """
     token, channel_id = get_telegram_credentials()
     if not token or not channel_id:
@@ -796,30 +829,22 @@ def test_telegram_alert() -> Dict[str, Any]:
             "link": "https://www.zerolive.in/"
         }
 
-    image_path = None
     try:
-        image_path = generate_telegram_card(sample_story)
-        caption = build_telegram_caption(sample_story)
-        success = send_telegram_photo(image_path, caption)
+        message_text = build_telegram_message(sample_story)
+        success = send_telegram_message(message_text, disable_web_page_preview=True)
         if success:
             return {
                 "status": "success",
-                "message": f"Test alert successfully delivered to {channel_id}!",
+                "message": f"Test text alert successfully delivered to {channel_id}!",
                 "story_title": sample_story.get("title")
             }
         else:
             return {
                 "status": "error",
-                "message": "Telegram API rejected the sendPhoto request. Check server logs."
+                "message": "Telegram API rejected the sendMessage request. Check server logs."
             }
     except Exception as e:
         return {
             "status": "error",
             "message": f"Exception during test Telegram send: {e}"
         }
-    finally:
-        if image_path and os.path.exists(image_path):
-            try:
-                os.remove(image_path)
-            except Exception:
-                pass
