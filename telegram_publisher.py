@@ -26,6 +26,12 @@ _PUBLISH_LOCK = threading.Lock()
 _SENT_IDS: Set[str] = set()
 _SENT_TITLES: Set[str] = set()
 
+# Rate Limiting: Max 3-4 news per hour (15-min cooldown between alerts)
+MAX_POSTS_PER_HOUR = 4
+MIN_COOLDOWN_SECONDS = 900  # 15 minutes = exactly 4 posts/hour max
+RATE_LIMIT_FILE = os.path.join(BASE_DIR, "telegram_rate_limit.json")
+MIN_IMPORTANCE_THRESHOLD = 45  # Minimum score to qualify as top-tier breaking news
+
 # Common Indian ticker list for smart hashtag tagging
 COMMON_TICKERS = [
     "RELIANCE", "TCS", "HDFCBANK", "INFOSYS", "ICICIBANK", "SBIN", "BHARTIARTL",
@@ -36,6 +42,79 @@ COMMON_TICKERS = [
     "EICHERMOT", "DIVISLAB", "APOLLOHOSP", "BPCL", "HEROMOTOCO", "INDUSINDBK",
     "NIFTY", "SENSEX", "BANKNIFTY", "RBI", "FED", "SEBI"
 ]
+
+# Aliases mapping normal company names to standard stock tickers
+TICKER_ALIASES = {
+    "TATA MOTORS": "TATAMOTORS",
+    "HDFC BANK": "HDFCBANK",
+    "ICICI BANK": "ICICIBANK",
+    "STATE BANK OF INDIA": "SBIN",
+    "STATE BANK": "SBIN",
+    "SBI": "SBIN",
+    "BHARTI AIRTEL": "BHARTIARTL",
+    "AIRTEL": "BHARTIARTL",
+    "HINDUSTAN UNILEVER": "HINDUNILVR",
+    "HUL": "HINDUNILVR",
+    "L&T": "LT",
+    "LARSEN & TOUBRO": "LT",
+    "LARSEN": "LT",
+    "BAJAJ FINANCE": "BAJFINANCE",
+    "BAJAJ FINSERV": "BAJAJFINSV",
+    "KOTAK MAHINDRA BANK": "KOTAKBANK",
+    "KOTAK BANK": "KOTAKBANK",
+    "AXIS BANK": "AXISBANK",
+    "SUN PHARMA": "SUNPHARMA",
+    "COAL INDIA": "COALINDIA",
+    "TATA STEEL": "TATASTEEL",
+    "POWER GRID": "POWERGRID",
+    "MAHINDRA & MAHINDRA": "M&M",
+    "MAHINDRA": "M&M",
+    "JSW STEEL": "JSWSTEEL",
+    "HCL TECH": "HCLTECH",
+    "ULTRATECH CEMENT": "ULTRACEMCO",
+    "TECH MAHINDRA": "TECHM",
+    "NESTLE INDIA": "NESTLEIND",
+    "NESTLE": "NESTLEIND",
+    "DR REDDY": "DRREDDY",
+    "EICHER MOTORS": "EICHERMOT",
+    "HERO MOTOCORP": "HEROMOTOCO",
+    "INDUSIND BANK": "INDUSINDBK",
+    "ADANI ENTERPRISES": "ADANIENT",
+    "ADANI PORTS": "ADANIPORTS",
+}
+
+# Heavyweight Nifty 50 and major market-moving stocks
+HEAVYWEIGHT_TICKERS = {
+    "RELIANCE", "TCS", "HDFCBANK", "INFOSYS", "ICICIBANK", "SBIN", "BHARTIARTL",
+    "ITC", "LT", "HINDUNILVR", "TATAMOTORS", "ADANIENT", "ADANIPORTS", "BAJFINANCE",
+    "MARUTI", "TITAN", "KOTAKBANK", "AXISBANK", "SUNPHARMA", "NTPC", "ONGC",
+    "COALINDIA", "TATASTEEL", "POWERGRID", "M&M", "JSWSTEEL", "WIPRO", "HCLTECH",
+    "ULTRACEMCO", "TECHM", "NESTLEIND", "GRASIM", "BAJAJFINSV", "CIPLA", "DRREDDY",
+    "EICHERMOT", "DIVISLAB", "APOLLOHOSP", "BPCL", "HEROMOTOCO", "INDUSINDBK",
+    "NIFTY", "SENSEX", "BANKNIFTY"
+}
+
+# Major market indices & macro terms pattern
+MACRO_TERMS_PATTERN = re.compile(
+    r'\b('
+    r'nifty\s*50|sensex|bank\s*nifty|gift\s*nifty|dalal\s*street|wall\s*street|dow\s*jones|nasdaq|'
+    r'rbi\b|reserve\s*bank|repo\s*rate|monetary\s*policy|mpc\b|us\s*fed|federal\s*reserve|'
+    r'interest\s*rate\s*(?:hike|cut|decision)|inflation|cpi\b|gdp\b|union\s*budget|'
+    r'market\s*(?:crash|bloodbath|rally|surge|plunge)|all-?time\s*high|record\s*high|52-?week\s*high|'
+    r'circuit\s*(?:limit|breaker|filter)|upper\s*circuit|lower\s*circuit|sebi\b|fii\s*(?:inflow|outflow|buying|selling)'
+    r')\b',
+    re.IGNORECASE
+)
+
+# High-impact corporate events pattern
+HIGH_IMPACT_EVENTS_PATTERN = re.compile(
+    r'\b('
+    r'mega\s*merger|acquisition|takeover|delisting|bonus\s*issue|stock\s*split|buyback|'
+    r'us\s*fda\s*(?:approval|warning|observation)|massive\s*order|huge\s*contract|'
+    r'fraud|scam|resignation\s*of\s*ceo|bankruptcy|default|insolvency|nclt'
+    r')\b',
+    re.IGNORECASE
+)
 
 # Comprehensive Pattern for Financial Results / Earnings
 EARNINGS_RESULTS_PATTERN = re.compile(
@@ -83,37 +162,68 @@ def is_routine_filing(title: str) -> bool:
     """Checks if a corporate filing is routine non-result paperwork."""
     return bool(ROUTINE_FILING_EXCLUSIONS.search(title))
 
-def should_publish_to_telegram(story: Dict[str, Any]) -> bool:
+def calculate_importance_score(story: Dict[str, Any]) -> int:
     """
-    OPTION 2 FILTER + EVERY EARNINGS NEWS:
-    1. Important News (crashes, surges, RBI/Fed policies, IPOs, macro).
-    2. Every Earnings News (quarterly results, Q1-Q4 net profit/loss, revenue, dividend announcements).
-    3. From NSE/BSE: STRICTLY Financial Results / Earnings ONLY (routine filings excluded).
+    Calculates a dynamic 0-100+ Importance Score to filter out noise
+    and select only top-tier, market-moving news for Telegram alerts.
     """
     title = (story.get("title") or "").strip()
     desc = (story.get("description") or "").strip()
-    src = (story.get("source") or "").lower()
-    feed = (story.get("feed_name") or "").lower()
-    link = (story.get("link") or "").lower()
+    full_text = f"{title} {desc}"
     art_type = (story.get("type") or "general").lower()
+    src = (story.get("source") or "").lower()
 
-    is_exchange = ("nse" in src or "bse" in src or "exchange" in src or "bseindia" in link or "nseindia" in link)
-    is_routine = is_routine_filing(title)
+    if is_routine_filing(title):
+        return 0
+
+    score = 0
+
+    # 1. Macro / Central Bank / Index Movement (+40)
+    if MACRO_TERMS_PATTERN.search(full_text):
+        score += 40
+
+    # 2. Key Heavyweight / Nifty 50 stock (+35)
+    ticker = extract_ticker(title, desc)
+    if ticker in HEAVYWEIGHT_TICKERS:
+        score += 35
+    elif ticker:
+        score += 15
+
+    # 3. High-Impact Corporate Event (Merger, Buyback, US FDA, Scandal) (+30)
+    if HIGH_IMPACT_EVENTS_PATTERN.search(full_text):
+        score += 30
+
+    # 4. Earnings / Financial Results (+25)
     is_earn = is_earnings_news(title, desc)
+    if is_earn:
+        score += 25
+        # Extra points if earnings show significant movement (surge/jump/crash/dividend)
+        if re.search(r'\b(surges?|jumps?|rises?|falls?|drops?|slips?|plunges?|soars?|up\s*\d+%|down\s*\d+%|dividend)\b', full_text, re.IGNORECASE):
+            score += 15
 
-    # 1. Exchange filings: strictly ONLY Financial Results / Earnings allowed
-    if is_exchange:
-        return is_earn and not is_routine
+    # 5. Volatility / Percentage Moves (+20)
+    if re.search(r'\b\d+(?:\.\d+)?%\s*(?:surge|jump|plunge|crash|rally|fall|drop|gain|loss)\b', full_text, re.IGNORECASE):
+        score += 20
 
-    # 2. Media news: Allow if it's an Earnings / Results story
-    if is_earn and not is_routine:
-        return True
+    # 6. Pre-classified as Important by system (+15)
+    if art_type == "important":
+        score += 15
 
-    # 3. Media news: Allow if classified as 'important'
-    if art_type == "important" and not is_routine:
-        return True
+    # Routine exchange filings penalty if NOT a heavyweight or NOT high-impact earnings
+    is_exchange = ("nse" in src or "bse" in src or "exchange" in src)
+    if is_exchange and ticker not in HEAVYWEIGHT_TICKERS and not is_earn:
+        score -= 25
 
-    return False
+    return max(0, score)
+
+
+def should_publish_to_telegram(story: Dict[str, Any]) -> bool:
+    """
+    Checks if a story meets the minimum importance threshold (score >= 45)
+    for Telegram alerts.
+    """
+    score = calculate_importance_score(story)
+    return score >= MIN_IMPORTANCE_THRESHOLD
 
 # Default built-in credentials for ZeroLive Telegram Channel
 DEFAULT_BOT_TOKEN = "8846942797:AAHsRl9jPAYoRaVGhTt5RG6EODVqunJW-NE"
@@ -243,6 +353,11 @@ def clean_raw_text(text: str) -> str:
 def extract_ticker(title: str, description: str = "") -> str:
     """Extracts high-confidence stock ticker tag from headline or description."""
     full_text = f"{title} {description}".upper()
+
+    # Check multi-word aliases first e.g. "TATA MOTORS" -> "TATAMOTORS"
+    for alias, ticker in TICKER_ALIASES.items():
+        if alias in full_text:
+            return ticker
 
     # Match bracketed codes e.g. [RELIANCE] or [TCS]
     bracket_match = re.search(r'\[([A-Z0-9_\.]{2,15})\]', title)
@@ -679,10 +794,72 @@ def init_first_boot_guard():
         _SENT_TITLES.update(db_titles)
 
 
-def process_and_publish_new_stories(limit: int = 15) -> int:
+def load_post_timestamps() -> List[float]:
+    """Loads list of recent post timestamps from JSON file."""
+    if not os.path.exists(RATE_LIMIT_FILE):
+        return []
+    try:
+        with open(RATE_LIMIT_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, list):
+                cutoff = time.time() - 86400
+                return [float(ts) for ts in data if float(ts) > cutoff]
+    except Exception as e:
+        logger.warning(f"Error loading {RATE_LIMIT_FILE}: {e}")
+    return []
+
+
+def record_post_timestamp(ts: Optional[float] = None):
+    """Records a new post timestamp and saves atomically."""
+    if ts is None:
+        ts = time.time()
+    try:
+        timestamps = load_post_timestamps()
+        timestamps.append(ts)
+        timestamps = sorted(timestamps)[-100:]
+        temp_file = RATE_LIMIT_FILE + ".tmp"
+        with open(temp_file, "w", encoding="utf-8") as f:
+            json.dump(timestamps, f)
+        if os.path.exists(temp_file):
+            os.replace(temp_file, RATE_LIMIT_FILE)
+    except Exception as e:
+        logger.error(f"Error recording post timestamp: {e}")
+
+
+def can_post_now() -> Tuple[bool, str]:
     """
-    Scans for newly arriving stories not yet published to Telegram,
-    generates cards, and broadcasts them with atomic locking and strict multi-layer deduplication.
+    Checks if an alert can be posted right now under the hourly quota (max 3-4/hr)
+    and minimum cooldown (15 minutes).
+    Returns (allowed, reason).
+    """
+    now = time.time()
+    timestamps = load_post_timestamps()
+
+    # 1. Check posts in the last 60 minutes (Hourly quota: max 4 posts)
+    one_hour_ago = now - 3600
+    recent_in_hour = [ts for ts in timestamps if ts >= one_hour_ago]
+    if len(recent_in_hour) >= MAX_POSTS_PER_HOUR:
+        oldest_in_window = min(recent_in_hour)
+        wait_seconds = max(0, int((oldest_in_window + 3600) - now))
+        return False, f"Hourly quota reached ({len(recent_in_hour)}/{MAX_POSTS_PER_HOUR} in last 60m). Next slot in ~{wait_seconds // 60}m."
+
+    # 2. Check minimum cooldown between posts (15 mins = 900s)
+    if timestamps:
+        last_post = max(timestamps)
+        elapsed = now - last_post
+        if elapsed < MIN_COOLDOWN_SECONDS:
+            remaining = int(MIN_COOLDOWN_SECONDS - elapsed)
+            return False, f"Cooldown active ({int(elapsed)}s < {MIN_COOLDOWN_SECONDS}s). Next alert eligible in ~{remaining // 60}m {remaining % 60}s."
+
+    return True, "Eligible to post."
+
+
+def process_and_publish_new_stories(limit: int = 25) -> int:
+    """
+    Scans for newly arriving stories not yet published to Telegram.
+    Enforces:
+    1. Maximum 3-4 news per hour (15-min cooldown between alerts).
+    2. Most Important news only (ranked by dynamic Importance Score).
     """
     global _PUBLISH_LOCK, _SENT_IDS, _SENT_TITLES
 
@@ -719,7 +896,7 @@ def process_and_publish_new_stories(limit: int = 15) -> int:
             logger.error(f"Error querying articles for Telegram publish: {e}")
             return 0
 
-        pending = []
+        candidates = []
         for art in recent_articles:
             rec_id = str(art.get("id") or art.get("link"))
             rec_link = str(art.get("link") or "").strip()
@@ -727,11 +904,9 @@ def process_and_publish_new_stories(limit: int = 15) -> int:
             t_hash = normalize_title_hash(title)
 
             # Strict Multi-Layer Deduplication:
-            # Check ID, URL, or Title Hash in memory cache
             if rec_id in _SENT_IDS or (rec_link and rec_link in _SENT_IDS) or (t_hash and t_hash in _SENT_TITLES):
                 continue
 
-            # Check persistent database log
             if is_story_sent_to_telegram(rec_id, title) or (rec_link and is_story_sent_to_telegram(rec_link, title)):
                 _SENT_IDS.add(rec_id)
                 if rec_link:
@@ -740,15 +915,10 @@ def process_and_publish_new_stories(limit: int = 15) -> int:
                     _SENT_TITLES.add(t_hash)
                 continue
 
-            # Check Option 2 Filter (Important + Financial Results)
-            if should_publish_to_telegram(art):
-                pending.append(art)
-                # Immediately pre-mark in in-memory cache to prevent any race condition
-                _SENT_IDS.add(rec_id)
-                if rec_link:
-                    _SENT_IDS.add(rec_link)
-                if t_hash:
-                    _SENT_TITLES.add(t_hash)
+            # Calculate Importance Score (0 to 100+)
+            score = calculate_importance_score(art)
+            if score >= MIN_IMPORTANCE_THRESHOLD:
+                candidates.append((score, art))
             else:
                 # Mark routine filings and unimpactful news so we don't re-check repeatedly
                 _SENT_IDS.add(rec_id)
@@ -758,43 +928,66 @@ def process_and_publish_new_stories(limit: int = 15) -> int:
                     _SENT_TITLES.add(t_hash)
                 mark_story_sent_to_telegram(rec_id, title)
 
-        if not pending:
+        if not candidates:
             save_sent_records(_SENT_IDS)
             return 0
 
-        # Publish oldest pending first so chronological order is preserved
-        pending.reverse()
-        published_count = 0
+        # Check Hourly Rate Limits (Max 3-4 news per hour, 15m cooldown)
+        can_post, reason = can_post_now()
+        if not can_post:
+            logger.info(f"Telegram Rate Limiter: {reason} Holding {len(candidates)} candidate(s).")
+            save_sent_records(_SENT_IDS)
+            return 0
 
-        for story in pending:
-            rec_id = str(story.get("id") or story.get("link"))
-            rec_link = str(story.get("link") or "").strip()
-            title = (story.get("title") or "").strip()
-            t_hash = normalize_title_hash(title)
-            try:
-                logger.info(f"Publishing Telegram text alert for story #{story.get('id')}: {title[:60]}...")
-                message_text = build_telegram_message(story)
-                success = send_telegram_message(message_text, disable_web_page_preview=True)
-                if success:
-                    published_count += 1
-                    # Persist to both database AND json file
-                    mark_story_sent_to_telegram(rec_id, title)
-                    if rec_link and rec_link != rec_id:
-                        mark_story_sent_to_telegram(rec_link, title)
-                    _SENT_IDS.add(rec_id)
-                    if rec_link:
-                        _SENT_IDS.add(rec_link)
-                    if t_hash:
-                        _SENT_TITLES.add(t_hash)
-                    save_sent_records(_SENT_IDS)
-                    logger.info(f"Successfully posted text alert to Telegram for #{story.get('id')}")
-                    time.sleep(2)
-                else:
-                    logger.warning(f"Failed to post text alert for story #{story.get('id')} to Telegram.")
-            except Exception as err:
-                logger.error(f"Error processing story for Telegram: {err}")
+        # Select the single MOST IMPORTANT candidate (highest score)
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        best_score, top_story = candidates[0]
 
-        return published_count
+        rec_id = str(top_story.get("id") or top_story.get("link"))
+        rec_link = str(top_story.get("link") or "").strip()
+        title = (top_story.get("title") or "").strip()
+        t_hash = normalize_title_hash(title)
+
+        try:
+            logger.info(f"Publishing top-ranked Telegram alert (score={best_score}): {title[:60]}...")
+            message_text = build_telegram_message(top_story)
+            success = send_telegram_message(message_text, disable_web_page_preview=True)
+            if success:
+                # Record timestamp for hourly rate limit (max 3-4/hr)
+                record_post_timestamp()
+
+                # Mark as sent in persistent storage
+                mark_story_sent_to_telegram(rec_id, title)
+                if rec_link and rec_link != rec_id:
+                    mark_story_sent_to_telegram(rec_link, title)
+                _SENT_IDS.add(rec_id)
+                if rec_link:
+                    _SENT_IDS.add(rec_link)
+                if t_hash:
+                    _SENT_TITLES.add(t_hash)
+                save_sent_records(_SENT_IDS)
+
+                # Mark other lower candidates in this batch so they do not build up backlogs
+                for other_score, other_story in candidates[1:]:
+                    o_id = str(other_story.get("id") or other_story.get("link"))
+                    o_link = str(other_story.get("link") or "").strip()
+                    o_title = (other_story.get("title") or "").strip()
+                    o_hash = normalize_title_hash(o_title)
+                    _SENT_IDS.add(o_id)
+                    if o_link:
+                        _SENT_IDS.add(o_link)
+                    if o_hash:
+                        _SENT_TITLES.add(o_hash)
+                    mark_story_sent_to_telegram(o_id, o_title)
+
+                logger.info(f"Successfully posted top news #{top_story.get('id')} to Telegram (score={best_score}). Next alert eligible in 15 mins.")
+                return 1
+            else:
+                logger.warning(f"Failed to post top story #{top_story.get('id')} to Telegram.")
+                return 0
+        except Exception as err:
+            logger.error(f"Error publishing top story to Telegram: {err}")
+            return 0
     finally:
         _PUBLISH_LOCK.release()
 
