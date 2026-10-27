@@ -542,11 +542,12 @@ def build_telegram_message(story: Dict[str, Any], base_url: str = "https://www.z
     else:
         story_url = story.get("link") or base_url
 
-    # Clean, uncluttered, professional text message
+    # Clean, uncluttered, professional text message:
+    # Headline & News context on TOP, Category Badge & Terminal link at the BOTTOM
     message = (
-        f"{badge_header}\n\n"
         f"📰 <b>{escaped_title}</b>"
         f"{desc_section}\n\n"
+        f"{badge_header}\n"
         f'⚡ <a href="{story_url}"><b>Read Full Story on ZeroLive Terminal ↗</b></a>'
     )
     return message
